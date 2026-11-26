@@ -1,0 +1,2417 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>MONSTER ARMY 3D</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #06080f;
+      color: #f8fafc;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+    input, select {
+      user-select: text;
+    }
+    #game-container {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+    .panel-dark {
+      background: rgba(8, 12, 24, 0.88);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(59, 130, 246, 0.28);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.75);
+      border-radius: 20px;
+    }
+    .btn-3d {
+      transition: transform 0.1s ease, filter 0.15s ease, box-shadow 0.15s ease;
+    }
+    .btn-3d:active {
+      transform: translateY(2px) scale(0.97);
+    }
+    .floating-text {
+      position: fixed;
+      pointer-events: none;
+      font-weight: 900;
+      z-index: 30;
+      transform: translate(-50%, -50%);
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.95);
+      animation: floatUp 0.85s ease-out forwards;
+    }
+    @keyframes floatUp {
+      0% { opacity: 0; transform: translate(-50%, -10%) scale(0.75); }
+      20% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
+      100% { opacity: 0; transform: translate(-50%, -140%) scale(0.95); }
+    }
+  </style>
+</head>
+<body>
+  <!-- 3D Sahna Konteyneri -->
+  <div id="game-container"></div>
+
+  <!-- O‘yin Ichidagi HUD -->
+  <div id="hud" class="hidden fixed inset-0 z-10 pointer-events-none flex flex-col justify-between p-3 sm:p-5">
+    <!-- Yuqori Qism -->
+    <div class="flex flex-wrap items-start justify-between gap-2">
+      <!-- Yo‘l nomi va Progress -->
+      <div class="panel-dark px-3.5 py-2.5 border-blue-500/40 pointer-events-auto">
+        <div id="hudWorldTitle" class="text-xs sm:text-sm font-black tracking-wide text-blue-400 uppercase">
+          BOSQICH 1 • 1-YO‘L — ZOMBI DUNYOSI
+        </div>
+        <div class="flex items-center gap-2.5 mt-1.5">
+          <div class="w-28 sm:w-40 h-2.5 bg-slate-900 rounded-full overflow-hidden border border-blue-500/30">
+            <div id="hudProgress" class="h-full bg-gradient-to-r from-blue-500 via-cyan-400 to-red-500 transition-all duration-100" style="width: 0%"></div>
+          </div>
+          <span id="hudPercent" class="text-[11px] font-extrabold text-slate-300">0%</span>
+        </div>
+      </div>
+
+      <!-- Askarlar soni, Tangalar va Qayta boshlash -->
+      <div class="panel-dark px-3.5 py-2.5 flex items-center gap-3 pointer-events-auto">
+        <div class="text-right">
+          <div class="text-[10px] font-bold text-slate-400 uppercase">TANGALAR</div>
+          <div id="hudCoins" class="text-sm sm:text-base font-black text-amber-400">0</div>
+        </div>
+        <div class="h-7 w-px bg-white/15"></div>
+        <div class="text-right">
+          <div class="text-[10px] font-bold text-blue-300 uppercase">ASKARLAR</div>
+          <div id="hudArmy" class="text-lg sm:text-xl font-black text-blue-400 leading-none">1</div>
+        </div>
+        <button id="btnRestartHud" type="button" class="btn-3d bg-red-600/80 hover:bg-red-600 border border-red-400/40 px-3 py-2 rounded-xl text-xs font-black text-white" title="Qayta boshlash">
+          ↻
+        </button>
+        <button id="btnMenuHud" type="button" class="btn-3d bg-slate-800 hover:bg-slate-700 border border-white/15 px-3 py-2 rounded-xl text-xs font-black text-slate-200" title="Menyu">
+          ☰
+        </button>
+      </div>
+    </div>
+
+    <!-- Boss Jon Shkalasi -->
+    <div id="bossBarWrap" class="hidden mx-auto w-full max-w-md panel-dark px-4 py-2.5 border-red-500/60 bg-red-950/75">
+      <div class="flex justify-between items-center text-xs font-black text-red-200 mb-1">
+        <span id="bossTitle">ZOMBI BOSS</span>
+        <span id="bossHpLabel">320 / 320</span>
+      </div>
+      <div class="w-full h-3 bg-black/80 rounded-full overflow-hidden border border-red-500/40">
+        <div id="bossHpFill" class="h-full bg-gradient-to-r from-red-600 via-red-500 to-amber-400 transition-all duration-100" style="width: 100%"></div>
+      </div>
+    </div>
+
+    <!-- Pastki Qism: Qurol va Mobil Boshqaruv -->
+    <div class="flex flex-col gap-2">
+      <div class="flex items-center justify-between gap-2">
+        <div class="panel-dark px-3.5 py-1.5 text-xs font-extrabold flex items-center gap-2 border-blue-500/30">
+          <span class="text-slate-400">Qurol:</span>
+          <span id="hudWeapon" class="text-blue-400">Pistolet</span>
+          <span class="text-white/20">|</span>
+          <span id="hudUserBadge" class="text-red-400">Mehmon</span>
+        </div>
+        <div class="hidden sm:block panel-dark px-3.5 py-1.5 text-xs text-slate-300">
+          Boshqaruv: <b class="text-blue-400">A / D</b>, <b class="text-blue-400">◀ / ▶</b> yoki ekranni suring
+        </div>
+      </div>
+
+      <!-- Telefon uchun Chap va O‘ng tugmalar -->
+      <div class="flex sm:hidden items-center justify-between gap-4 pointer-events-auto">
+        <button id="touchLeftBtn" type="button" class="btn-3d flex-1 panel-dark py-4 rounded-2xl text-base font-black text-blue-300 border-blue-500/40 active:bg-blue-600/40">
+          ◀ CHAPGA
+        </button>
+        <button id="touchRightBtn" type="button" class="btn-3d flex-1 panel-dark py-4 rounded-2xl text-base font-black text-blue-300 border-blue-500/40 active:bg-blue-600/40">
+          O‘NGGA ▶
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 1. AKKAUNT MODALI (RO‘YXATDAN O‘TISH / LOGIN) -->
+  <div id="authModal" class="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+    <div class="panel-dark w-full max-w-md p-6 border-blue-500/40 space-y-5">
+      <div class="text-center space-y-1">
+        <div class="inline-block px-3 py-1 rounded-full bg-red-600/20 border border-red-500/40 text-red-400 text-[11px] font-black uppercase tracking-wider">
+          3D ACTION RUNNER
+        </div>
+        <h1 class="text-3xl font-black tracking-tight text-white">
+          MONSTER <span class="text-blue-500">ARMY</span> <span class="text-red-500">3D</span>
+        </h1>
+        <p class="text-xs text-slate-400">Tangalar va qurollar saqlanishi uchun hisobingizga kiring</p>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2 bg-black/50 p-1 rounded-xl border border-white/10">
+        <button id="authTabLogin" type="button" class="py-2 rounded-lg text-xs font-black bg-blue-600 text-white">KIRISH (LOGIN)</button>
+        <button id="authTabRegister" type="button" class="py-2 rounded-lg text-xs font-black text-slate-400 hover:text-white">RO‘YXATDAN O‘TISH</button>
+      </div>
+
+      <form id="authForm" class="space-y-3" novalidate>
+        <div>
+          <label class="block text-xs font-bold text-slate-300 mb-1">Foydalanuvchi nomi (Login)</label>
+          <input id="authUsername" type="text" autocomplete="username" placeholder="Masalan: Jasur3D"
+            class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-blue-500/30 text-sm text-white focus:outline-none focus:border-blue-400" />
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-300 mb-1">Parol</label>
+          <div class="relative flex items-center">
+            <input id="authPassword" type="password" autocomplete="current-password" placeholder="Kamida 3 ta belgi"
+              class="w-full px-3.5 py-2.5 pr-16 rounded-xl bg-slate-950 border border-blue-500/30 text-sm text-white focus:outline-none focus:border-blue-400" />
+            <button id="btnTogglePassword" type="button"
+              class="absolute right-2 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] font-bold text-blue-300 border border-white/10">
+              Ko‘rish
+            </button>
+          </div>
+        </div>
+        <div id="authError" class="hidden text-xs font-bold text-red-400 bg-red-950/60 border border-red-500/30 px-3 py-2 rounded-xl"></div>
+        <button id="authSubmitBtn" type="submit" class="btn-3d w-full py-3 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 text-white font-black text-sm shadow-lg shadow-blue-600/30">
+          HISOBGA KIRISH ▶
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- 2. QUROL DO‘KONI VA YO‘L TANLASH LOBBISI -->
+  <div id="lobbyModal" class="hidden fixed inset-0 z-30 flex items-center justify-center p-3 sm:p-5 bg-black/80 backdrop-blur-md">
+    <div class="panel-dark w-full max-w-4xl max-h-[92vh] overflow-y-auto p-4 sm:p-6 border-blue-500/40 space-y-5">
+      <!-- Yuqori Sarlavha -->
+      <div class="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-white/10">
+        <div>
+          <h2 class="text-2xl sm:text-3xl font-black text-white">
+            MONSTER <span class="text-blue-500">ARMY</span> <span class="text-red-500">3D</span>
+          </h2>
+          <div class="text-xs text-slate-400 mt-0.5 flex flex-wrap items-center gap-2">
+            <span>O‘yinchi: <span id="lobbyUsername" class="font-bold text-blue-400">—</span></span>
+            <span>•</span>
+            <span>Maksimal bosqich: <span id="lobbyMaxStage" class="font-bold text-emerald-400">1 / 10 000</span></span>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-2.5">
+          <!-- Grafika sifati -->
+          <div class="bg-black/60 border border-white/15 px-2.5 py-1.5 rounded-2xl flex items-center gap-1.5">
+            <span class="text-[10px] font-bold text-slate-400 uppercase">Grafika:</span>
+            <select id="gfxQualitySelect" class="bg-slate-900 text-xs font-black text-blue-300 px-2 py-1 rounded-lg border border-blue-500/30 focus:outline-none">
+              <option value="low">Past (Tez)</option>
+              <option value="medium" selected>O‘rta</option>
+              <option value="high">Yuqori (3D)</option>
+            </select>
+          </div>
+          <div class="bg-black/60 border border-amber-500/40 px-4 py-2 rounded-2xl flex items-center gap-2">
+            <span class="text-lg">🪙</span>
+            <div>
+              <div class="text-[10px] font-bold text-slate-400 uppercase">Tangalar</div>
+              <div id="lobbyCoins" class="text-base font-black text-amber-400 leading-none">0</div>
+            </div>
+          </div>
+          <button id="btnLogout" type="button" class="btn-3d bg-red-950/70 hover:bg-red-900 border border-red-500/40 px-3 py-2.5 rounded-xl text-xs font-bold text-red-300">
+            Chiqish
+          </button>
+        </div>
+      </div>
+
+      <!-- QUROL DO‘KONI -->
+      <div>
+        <div class="flex items-center justify-between mb-2.5">
+          <h3 class="text-sm font-black uppercase tracking-wider text-blue-400">🔫 QUROL DO‘KONI</h3>
+          <span class="text-xs text-slate-400">Qurol tanlansa askarlar qo‘lidagi qurol o‘zgaradi</span>
+        </div>
+        <div id="weaponShopGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"></div>
+      </div>
+
+      <!-- DUNYOLAR VA TEZKOR YO‘LLAR -->
+      <div>
+        <div class="flex items-center justify-between mb-2.5">
+          <h3 class="text-sm font-black uppercase tracking-wider text-red-400">🌍 DUNYOLAR VA YO‘LLAR</h3>
+          <span class="text-xs text-slate-400">Ilonlar 2-bosqichdan, o‘rgimchaklar 3-bosqichdan boshlanadi</span>
+        </div>
+        <div id="worldsList" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5"></div>
+      </div>
+
+      <!-- 10 000 BOSQICHLI LEVEL MAP -->
+      <div class="bg-black/45 border border-blue-500/25 rounded-2xl p-3.5 sm:p-4 space-y-3">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 class="text-sm font-black uppercase tracking-wider text-emerald-400">🗺️ 10 000 BOSQICHLI LEVEL MAP</h3>
+            <p class="text-[11px] text-slate-400">Bosqichlar ketma-ket ochiladi. Ochilgan bosqichlarni qayta o‘ynash mumkin.</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-1.5">
+            <button id="btnPagePrev" type="button" class="btn-3d px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-black text-white border border-white/10">◀</button>
+            <select id="levelPageSelect" class="bg-slate-900 text-xs font-black text-emerald-300 px-2.5 py-1.5 rounded-lg border border-emerald-500/30 focus:outline-none"></select>
+            <button id="btnPageNext" type="button" class="btn-3d px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-black text-white border border-white/10">▶</button>
+            <button id="btnJumpCurrent" type="button" class="btn-3d px-2.5 py-1.5 rounded-lg bg-blue-600/80 hover:bg-blue-600 text-xs font-black text-white">Joriy bosqich</button>
+          </div>
+        </div>
+        <div id="levelMapGrid" class="grid grid-cols-5 sm:grid-cols-10 gap-1.5 max-h-48 overflow-y-auto pr-1"></div>
+      </div>
+
+      <!-- START TUGMASI -->
+      <div class="pt-1 flex flex-col sm:flex-row items-center justify-between gap-3 bg-gradient-to-r from-blue-950/80 via-slate-900 to-red-950/80 border border-blue-500/30 p-4 rounded-2xl">
+        <div>
+          <div class="text-[11px] font-bold text-blue-300 uppercase">Tanlangan bosqich va dunyo</div>
+          <div id="selectedWorldName" class="text-base sm:text-lg font-black text-white">BOSQICH 1 • 1-YO‘L — ZOMBI DUNYOSI</div>
+        </div>
+        <button id="btnStartGame" type="button" class="btn-3d w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 via-blue-500 to-red-600 text-white font-black text-base shadow-lg shadow-blue-600/30">
+          ▶ O‘YINNI BOSHLASH
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. O‘YIN TUGASHI MODALI (G‘ALABA / MAG‘LUBIYAT) -->
+  <div id="resultModal" class="hidden fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+    <div class="panel-dark w-full max-w-md p-6 text-center space-y-4 border-blue-500/40">
+      <div id="resBadge" class="inline-block px-3 py-1 rounded-full text-xs font-black uppercase bg-blue-600/20 text-blue-300 border border-blue-500/40">
+        NATIJA
+      </div>
+      <h2 id="resTitle" class="text-3xl font-black text-white">G‘ALABA!</h2>
+      <p id="resDesc" class="text-sm text-slate-300">Boss yo‘q qilindi!</p>
+      <div class="grid grid-cols-2 gap-3 bg-black/50 border border-white/10 rounded-2xl p-3.5">
+        <div>
+          <div class="text-[11px] text-slate-400">YIG‘ILGAN TANGA</div>
+          <div id="resCoins" class="text-xl font-black text-amber-400">+0</div>
+        </div>
+        <div>
+          <div class="text-[11px] text-slate-400">ASKARLAR</div>
+          <div id="resSoldiers" class="text-xl font-black text-blue-400">0</div>
+        </div>
+      </div>
+      <div class="flex flex-col sm:flex-row gap-2.5">
+        <button id="btnNextStage" type="button" class="hidden btn-3d flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black">
+          KEYINGI BOSQICH ▶
+        </button>
+        <button id="btnPlayAgain" type="button" class="btn-3d flex-1 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black">
+          ↻ QAYTA BOSHLASH
+        </button>
+        <button id="btnBackLobby" type="button" class="btn-3d flex-1 py-3 rounded-xl bg-red-600/80 hover:bg-red-600 text-white font-black">
+          🗺️ XARITA VA DO‘KON
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (() => {
+    'use strict';
+
+    // =========================================================================
+    // 1. KONFIGURATSIYA: QUROLLAR, DUNYOLAR VA 10 000 BOSQICH GENERATORI
+    // =========================================================================
+    const MAX_STAGES = 10000;
+    const STAGES_PER_PAGE = 50;
+    const ROAD_HALF_WIDTH = 7.5;
+
+    const WEAPONS = [
+      {
+        id: 'pistol',
+        name: 'Pistolet',
+        price: 0,
+        damage: 34,
+        fireInterval: 0.34,
+        bulletColor: 0x38bdf8,
+        bulletSpeed: 66,
+        desc: 'Bepul boshlang‘ich qurol. Aniq va barqaror.'
+      },
+      {
+        id: 'rifle',
+        name: 'Avtomat',
+        price: 100,
+        damage: 56,
+        fireInterval: 0.19,
+        bulletColor: 0xfacc15,
+        bulletSpeed: 78,
+        desc: 'Tez otar avtomat. Zombi va ilonlarni tez yoradi.'
+      },
+      {
+        id: 'laser',
+        name: 'Lazer quroli',
+        price: 200,
+        damage: 96,
+        fireInterval: 0.14,
+        bulletColor: 0xef4444,
+        bulletSpeed: 98,
+        desc: 'Yuqori energiyali lazer nuri. Bosslarga kuchli zarar!'
+      },
+      {
+        id: 'plasma',
+        name: 'Plazma Zambaragi',
+        price: 500,
+        damage: 170,
+        fireInterval: 0.12,
+        bulletColor: 0xa855f7,
+        bulletSpeed: 108,
+        desc: 'Yuqori bosqichli gigant bosslarni erituvchi plazma quroli!'
+      }
+    ];
+
+    const WORLDS = [
+      {
+        id: 1,
+        routeLabel: '1-YO‘L',
+        shortName: 'Zombi Dunyosi',
+        desc: 'Zombilar to‘dasi, tikanli tuzoqlar hamda Ulkan Zombi Boss (1-bosqich).',
+        skyColor: 0x090d1a,
+        fogColor: 0x090d1a,
+        roadColor: 0x161d2e,
+        sideColor: 0x0b1120,
+        accentColor: 0x3b82f6,
+        bossName: 'ULKAN ZOMBI BOSS',
+        bossType: 'zombie_boss',
+        bossAttackStyle: 'slam',
+        baseBossHp: 1150,
+        enemyTypes: ['zombie'],
+        trapPool: ['spikes', 'spinner', 'popup']
+      },
+      {
+        id: 2,
+        routeLabel: '2-YO‘L',
+        shortName: 'Ulkan Ilonlar Dunyosi',
+        desc: '2-bosqichdan ilonlar qo‘shiladi: egilib harakatlanuvchi ilonlar va Gigant Ilon Boss.',
+        skyColor: 0x071714,
+        fogColor: 0x071714,
+        roadColor: 0x112922,
+        sideColor: 0x05120e,
+        accentColor: 0x10b981,
+        bossName: 'GIGANT ILON BOSS',
+        bossType: 'snake_boss',
+        bossAttackStyle: 'venom',
+        baseBossHp: 1650,
+        enemyTypes: ['snake', 'zombie'],
+        trapPool: ['spinner', 'popup', 'spikes']
+      },
+      {
+        id: 3,
+        routeLabel: '3-YO‘L',
+        shortName: 'Gigant O‘rgimchaklar Dunyosi',
+        desc: '3-bosqichdan o‘rgimchaklar qo‘shiladi: 8 oyoqli o‘rgimchaklar, zaharli to‘r va Ulkan O‘rgimchak Boss.',
+        skyColor: 0x14081c,
+        fogColor: 0x14081c,
+        roadColor: 0x221030,
+        sideColor: 0x0e0614,
+        accentColor: 0xa855f7,
+        bossName: 'ULKAN O‘RGIMCHAK BOSS',
+        bossType: 'spider_boss',
+        bossAttackStyle: 'web_volley',
+        baseBossHp: 2250,
+        enemyTypes: ['spider', 'snake'],
+        trapPool: ['popup', 'spikes', 'spinner']
+      },
+      {
+        id: 4,
+        routeLabel: '4-YO‘L',
+        shortName: 'Mutantlar Dunyosi',
+        desc: 'Chidamli mutantlar, ilonlar, o‘rgimchaklar va Mutant Boss.',
+        skyColor: 0x1a090c,
+        fogColor: 0x1a090c,
+        roadColor: 0x2d1218,
+        sideColor: 0x120608,
+        accentColor: 0xef4444,
+        bossName: 'MUTANT BOSS',
+        bossType: 'mutant_boss',
+        bossAttackStyle: 'rage_slam',
+        baseBossHp: 3100,
+        enemyTypes: ['mutant', 'spider', 'zombie'],
+        trapPool: ['spinner', 'popup', 'spikes']
+      },
+      {
+        id: 5,
+        routeLabel: '5-YO‘L',
+        shortName: 'Ulkan Maxluqlar Dunyosi',
+        desc: 'Barcha maxluq turlari, tuzoqlar va Gigant Maxluq Boss.',
+        skyColor: 0x1a1106,
+        fogColor: 0x1a1106,
+        roadColor: 0x2c1d0c,
+        sideColor: 0x120b04,
+        accentColor: 0xf59e0b,
+        bossName: 'GIGANT MAXLUQ BOSS',
+        bossType: 'titan_boss',
+        bossAttackStyle: 'cataclysm',
+        baseBossHp: 4200,
+        enemyTypes: ['mutant', 'spider', 'snake', 'zombie'],
+        trapPool: ['popup', 'spinner', 'spikes']
+      },
+      {
+        id: 6,
+        routeLabel: '6-YO‘L',
+        shortName: 'Kiber-Maxluqlar Dunyosi',
+        desc: 'Kiber-mutantlar, zaharli to‘rlar va Oliy Kiber-Boss.',
+        skyColor: 0x05121d,
+        fogColor: 0x05121d,
+        roadColor: 0x0c2236,
+        sideColor: 0x040d15,
+        accentColor: 0x06b6d4,
+        bossName: 'OLIY KIBER-BOSS',
+        bossType: 'cyber_boss',
+        bossAttackStyle: 'cataclysm',
+        baseBossHp: 5600,
+        enemyTypes: ['mutant', 'spider', 'snake'],
+        trapPool: ['spinner', 'popup', 'spikes']
+      }
+    ];
+
+    function getStageConfig(stageNum) {
+      const s = Math.max(1, Math.min(MAX_STAGES, Math.floor(stageNum)));
+      let worldIdx = 0;
+      if (s === 1) worldIdx = 0;
+      else if (s === 2) worldIdx = 1;
+      else if (s === 3) worldIdx = 2;
+      else worldIdx = Math.floor((s - 1) / 5) % WORLDS.length;
+
+      const world = WORLDS[worldIdx];
+      const tier = s - 1;
+
+      let difficultyLabel = 'OSON';
+      let hpFactor = 0.82 + tier * 0.085;
+      let dmgFactor = 0.75 + tier * 0.045;
+      let speedFactor = 0.95 + Math.min(0.45, tier * 0.015);
+      let bossHpFactor = 1.25 + tier * 0.28;
+      let bossDmgFactor = 0.8 + tier * 0.05;
+
+      if (s > 10 && s <= 50) {
+        difficultyLabel = 'O‘RTACHA QIYIN';
+        hpFactor = 1.67 + (s - 10) * 0.16;
+        dmgFactor = 1.2 + (s - 10) * 0.035;
+        speedFactor = 1.1 + (s - 10) * 0.008;
+        bossHpFactor = 4.05 + (s - 10) * 0.55;
+        bossDmgFactor = 1.3 + (s - 10) * 0.04;
+      } else if (s > 50 && s <= 100) {
+        difficultyLabel = 'QIYIN';
+        hpFactor = 8.07 + (s - 50) * 0.36;
+        dmgFactor = 2.6 + (s - 50) * 0.05;
+        speedFactor = 1.42 + (s - 50) * 0.006;
+        bossHpFactor = 26.05 + (s - 50) * 1.25;
+        bossDmgFactor = 2.9 + (s - 50) * 0.05;
+      } else if (s > 100 && s <= 500) {
+        difficultyLabel = 'JUDA QIYIN';
+        hpFactor = 26.07 + (s - 100) * 0.68;
+        dmgFactor = 5.1 + (s - 100) * 0.025;
+        speedFactor = 1.72 + Math.min(0.4, (s - 100) * 0.001);
+        bossHpFactor = 88.55 + (s - 100) * 2.8;
+        bossDmgFactor = 5.4 + (s - 100) * 0.022;
+      } else if (s > 500 && s <= 1000) {
+        difficultyLabel = 'EKSTREMAL QIYIN';
+        hpFactor = 298 + (s - 500) * 1.35;
+        dmgFactor = 15.1 + (s - 500) * 0.035;
+        speedFactor = 2.12 + Math.min(0.4, (s - 500) * 0.0008);
+        bossHpFactor = 1208.55 + (s - 500) * 5.6;
+        bossDmgFactor = 14.2 + (s - 500) * 0.03;
+      } else if (s > 1000) {
+        const centurySteps = Math.floor((s - 1001) / 100) + 1;
+        const extraInBlock = (s - 1001) % 100;
+        difficultyLabel = `EKSTREMAL +${centurySteps * 100}`;
+        hpFactor = 973 + centurySteps * 420 + extraInBlock * 3.2;
+        dmgFactor = 32.6 + centurySteps * 5.2 + extraInBlock * 0.04;
+        speedFactor = 2.52 + Math.min(0.45, centurySteps * 0.04);
+        bossHpFactor = 4008 + centurySteps * 2100 + extraInBlock * 14.0;
+        bossDmgFactor = 29.2 + centurySteps * 4.8 + extraInBlock * 0.035;
+      }
+
+      const isCenturyBoss = s % 100 === 0;
+      const isMilestoneBoss = s % 20 === 0 || s % 10 === 0;
+      const milestoneMult = isCenturyBoss ? 2.0 : (s % 20 === 0 ? 1.55 : (isMilestoneBoss ? 1.3 : 1.05));
+
+      const sizeMult = Math.min(2.55, 1.18 + Math.log10(1 + tier * 0.42) * 0.52);
+      const speedMult = Math.min(3.1, speedFactor);
+
+      const bossPrefix = isCenturyBoss
+        ? 'MEGA-TITAN '
+        : (s % 20 === 0 ? 'ELITA ' : (isMilestoneBoss ? 'KUCHAYGAN ' : ''));
+
+      // Ilonlar 2-bosqichdan, o‘rgimchaklar esa 3-bosqichdan qo‘shiladi
+      const availableEnemies = ['zombie'];
+      if (s >= 2) availableEnemies.push('snake');
+      if (s >= 3) availableEnemies.push('spider');
+      if (s >= 4 && world.enemyTypes.includes('mutant')) availableEnemies.push('mutant');
+
+      return {
+        stage: s,
+        world,
+        enemyTypes: availableEnemies,
+        difficultyLabel,
+        isCenturyBoss,
+        isMilestoneBoss,
+        title: `BOSQICH ${s} [${difficultyLabel}] • ${world.routeLabel} — ${world.shortName.toUpperCase()}`,
+        length: Math.min(540, 280 + Math.floor(Math.log10(1 + tier) * 80)),
+        enemyHpMult: hpFactor,
+        enemyDmgMult: dmgFactor,
+        enemyScaleMult: sizeMult,
+        enemySpeedMult: speedMult,
+        bossName: `${bossPrefix}${world.bossName}`,
+        bossHp: Math.round(world.baseBossHp * bossHpFactor * milestoneMult * 0.85),
+        bossDamage: Math.round((65 + world.id * 14) * bossDmgFactor * (isCenturyBoss ? 1.45 : 1.08)),
+        rewardCoins: Math.round((65 + world.id * 26 + Math.min(1800, tier * 7)) * milestoneMult)
+      };
+    }
+
+    function getWeaponEffectiveness(weaponId, enemyType, isBoss) {
+      if (isBoss) {
+        if (weaponId === 'plasma') return 1.45;
+        if (weaponId === 'laser') return 1.25;
+        if (weaponId === 'rifle') return 1.05;
+        return 0.88;
+      }
+      if (enemyType === 'zombie') {
+        if (weaponId === 'rifle') return 1.35;
+        if (weaponId === 'pistol') return 1.2;
+        return 1.0;
+      }
+      if (enemyType === 'snake') {
+        if (weaponId === 'laser') return 1.35;
+        if (weaponId === 'rifle') return 1.15;
+        return 0.98;
+      }
+      if (enemyType === 'spider') {
+        if (weaponId === 'plasma') return 1.35;
+        if (weaponId === 'laser') return 1.2;
+        return 0.92;
+      }
+      if (weaponId === 'plasma') return 1.5;
+      if (weaponId === 'laser') return 1.3;
+      if (weaponId === 'rifle') return 1.0;
+      return 0.82;
+    }
+
+    // =========================================================================
+    // 2. AKKAUNT TIZIMI (localStorage)
+    // =========================================================================
+    const STORAGE_USERS_KEY = 'monster_army_3d_users_v1';
+    const STORAGE_CURRENT_KEY = 'monster_army_3d_current_user_v1';
+
+    let usersDB = {};
+    let currentUser = null;
+    let authMode = 'login';
+    let selectedStage = 1;
+    let levelMapPage = 0;
+    let gfxQuality = 'medium';
+
+    function normalizeUser(u, fallbackUsername = '') {
+      if (!u || typeof u !== 'object') return null;
+      const cleanName = String(u.username || fallbackUsername || '').trim();
+      if (!cleanName) return null;
+      if (!Array.isArray(u.ownedWeapons) || u.ownedWeapons.length === 0) u.ownedWeapons = ['pistol'];
+      u.ownedWeapons = u.ownedWeapons.filter(wId => WEAPONS.some(w => w.id === wId));
+      if (u.ownedWeapons.length === 0) u.ownedWeapons = ['pistol'];
+      if (!u.equippedWeapon || !u.ownedWeapons.includes(u.equippedWeapon)) {
+        u.equippedWeapon = u.ownedWeapons[0];
+      }
+      if (typeof u.coins !== 'number' || isNaN(u.coins) || u.coins < 0) u.coins = 50;
+      if (typeof u.unlockedStage !== 'number' || isNaN(u.unlockedStage) || u.unlockedStage < 1) {
+        u.unlockedStage = 1;
+      }
+      u.unlockedStage = Math.min(MAX_STAGES, Math.floor(u.unlockedStage));
+      if (!u.gfxQuality) u.gfxQuality = 'medium';
+      u.username = cleanName;
+      u.password = String(u.password ?? '');
+      return u;
+    }
+
+    function safeReadStorage(key) {
+      try {
+        return window.localStorage.getItem(key);
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function safeWriteStorage(key, value) {
+      try {
+        window.localStorage.setItem(key, value);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function safeRemoveStorage(key) {
+      try {
+        window.localStorage.removeItem(key);
+      } catch (e) {}
+    }
+
+    function loadUsersDB() {
+      const nextDB = {};
+      const raw = safeReadStorage(STORAGE_USERS_KEY);
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            parsed.forEach(item => {
+              const norm = normalizeUser(item);
+              if (norm) {
+                nextDB[norm.username] = norm;
+                const lowerKey = norm.username.toLowerCase();
+                if (!nextDB[lowerKey]) nextDB[lowerKey] = norm;
+              }
+            });
+          } else if (parsed && typeof parsed === 'object') {
+            Object.keys(parsed).forEach(key => {
+              const norm = normalizeUser(parsed[key], key);
+              if (norm) {
+                nextDB[norm.username] = norm;
+                const lowerKey = norm.username.toLowerCase();
+                if (!nextDB[lowerKey]) nextDB[lowerKey] = norm;
+              }
+            });
+          }
+        } catch (e) {}
+      }
+      usersDB = nextDB;
+    }
+
+    function findUserByUsername(inputUsername) {
+      const trimmed = String(inputUsername || '').trim();
+      if (!trimmed) return null;
+      if (usersDB[trimmed]) return usersDB[trimmed];
+      const lower = trimmed.toLowerCase();
+      if (usersDB[lower]) return usersDB[lower];
+      const matchedKey = Object.keys(usersDB).find(k => {
+        const u = usersDB[k];
+        return u && String(u.username || '').trim().toLowerCase() === lower;
+      });
+      return matchedKey ? usersDB[matchedKey] : null;
+    }
+
+    function saveUsersDB() {
+      const uniqueMap = {};
+      Object.keys(usersDB).forEach(k => {
+        const u = normalizeUser(usersDB[k]);
+        if (u && !uniqueMap[u.username]) {
+          uniqueMap[u.username] = u;
+        }
+      });
+      usersDB = {};
+      Object.keys(uniqueMap).forEach(uname => {
+        usersDB[uname] = uniqueMap[uname];
+        const lower = uname.toLowerCase();
+        if (!usersDB[lower]) usersDB[lower] = uniqueMap[uname];
+      });
+      safeWriteStorage(STORAGE_USERS_KEY, JSON.stringify(uniqueMap));
+      if (currentUser && currentUser.username) {
+        safeWriteStorage(STORAGE_CURRENT_KEY, currentUser.username);
+      }
+    }
+
+    function syncCurrentUser() {
+      if (!currentUser) return;
+      currentUser = normalizeUser(currentUser);
+      if (!currentUser) return;
+      usersDB[currentUser.username] = currentUser;
+      usersDB[currentUser.username.toLowerCase()] = currentUser;
+      saveUsersDB();
+      updateUIState();
+    }
+
+    function enterLobbyForUser(userObj) {
+      currentUser = normalizeUser(userObj);
+      if (!currentUser) return;
+      usersDB[currentUser.username] = currentUser;
+      usersDB[currentUser.username.toLowerCase()] = currentUser;
+      saveUsersDB();
+
+      selectedStage = currentUser.unlockedStage;
+      levelMapPage = Math.floor((selectedStage - 1) / STAGES_PER_PAGE);
+      applyGraphicsQuality(currentUser.gfxQuality);
+
+      const authErrorEl = document.getElementById('authError');
+      authErrorEl.classList.add('hidden');
+      authErrorEl.textContent = '';
+
+      document.getElementById('authModal').classList.add('hidden');
+      document.getElementById('lobbyModal').classList.remove('hidden');
+      updateUIState();
+    }
+
+    function tryAutoLogin() {
+      loadUsersDB();
+      const savedUsername = safeReadStorage(STORAGE_CURRENT_KEY);
+      if (savedUsername) {
+        const found = findUserByUsername(savedUsername);
+        if (found) {
+          enterLobbyForUser(found);
+          return;
+        }
+      }
+      if (!currentUser) {
+        document.getElementById('lobbyModal').classList.add('hidden');
+        document.getElementById('hud').classList.add('hidden');
+        document.getElementById('authModal').classList.remove('hidden');
+      }
+    }
+
+    // =========================================================================
+    // 3. THREE.JS 3D SAHNA, MODELLAR VA SIMULYATSIYA
+    // =========================================================================
+    let scene = null;
+    let camera = null;
+    let renderer = null;
+    let worldGroup = null;
+    let entitiesGroup = null;
+    let dirLight = null;
+
+    let gameActive = false;
+    let gameEnded = false;
+    let currentStageCfg = getStageConfig(1);
+    let armyCount = 1;
+    let runCoins = 0;
+    let squadX = 0;
+    let squadZ = 0;
+    let forwardSpeed = 12.8;
+    let fireTimer = 0;
+    let simTime = 0;
+    let invulnTimer = 0;
+
+    let gates = [];
+    let traps = [];
+    let enemies = [];
+    let bullets = [];
+    let enemyProjectiles = [];
+    let particles = [];
+    let boss = null;
+    let bossSpawnZ = -180;
+    let bossTriggered = false;
+    let squadCounterSprite = null;
+    let lastShownArmyCount = -1;
+    let lastHudArmyValue = -1;
+    let hudPulseTimer = 0;
+
+    const keys = { left: false, right: false };
+    let pointerActive = false;
+    let lastPointerX = 0;
+
+    function spawnFloatingText(text, colorClass, worldX = squadX, worldY = 3.2, worldZ = squadZ - 4) {
+      if (!camera) return;
+      const vec = new THREE.Vector3(worldX, worldY, worldZ);
+      vec.project(camera);
+      if (vec.z > 1) return;
+      const x = (vec.x * 0.5 + 0.5) * window.innerWidth;
+      const y = (-vec.y * 0.5 + 0.5) * window.innerHeight;
+      const el = document.createElement('div');
+      el.className = `floating-text text-sm sm:text-base ${colorClass}`;
+      el.style.left = `${Math.max(40, Math.min(window.innerWidth - 40, x))}px`;
+      el.style.top = `${Math.max(50, Math.min(window.innerHeight - 60, y))}px`;
+      el.textContent = text;
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 860);
+    }
+
+    function applyGraphicsQuality(quality) {
+      const q = (quality === 'low' || quality === 'medium' || quality === 'high') ? quality : 'medium';
+      gfxQuality = q;
+      if (renderer) {
+        const maxPixelRatio = q === 'high'
+          ? Math.min(window.devicePixelRatio || 1, 2)
+          : (q === 'medium' ? Math.min(window.devicePixelRatio || 1, 1.5) : 1);
+        renderer.setPixelRatio(maxPixelRatio);
+        renderer.shadowMap.enabled = q !== 'low';
+      }
+      if (dirLight) {
+        dirLight.castShadow = q !== 'low';
+        const mapSize = q === 'high' ? 1024 : 512;
+        dirLight.shadow.mapSize.set(mapSize, mapSize);
+      }
+    }
+
+    function initThreeScene() {
+      if (scene && renderer) return;
+      const container = document.getElementById('game-container');
+      const w = container && container.clientWidth ? container.clientWidth : window.innerWidth;
+      const h = container && container.clientHeight ? container.clientHeight : window.innerHeight;
+
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x090d1a);
+      scene.fog = new THREE.FogExp2(0x090d1a, 0.0085);
+
+      camera = new THREE.PerspectiveCamera(60, w / Math.max(1, h), 0.1, 650);
+      camera.position.set(0, 11.5, 19);
+      camera.lookAt(0, 2.2, -16);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+      renderer.setSize(w, h);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+      if (container) {
+        container.innerHTML = '';
+        container.appendChild(renderer.domElement);
+      }
+
+      const hemiLight = new THREE.HemisphereLight(0x93c5fd, 0x0f172a, 1.15);
+      scene.add(hemiLight);
+
+      dirLight = new THREE.DirectionalLight(0xffffff, 1.25);
+      dirLight.position.set(16, 30, 14);
+      dirLight.castShadow = true;
+      dirLight.shadow.camera.near = 2;
+      dirLight.shadow.camera.far = 140;
+      const d = 32;
+      dirLight.shadow.camera.left = -d;
+      dirLight.shadow.camera.right = d;
+      dirLight.shadow.camera.top = d;
+      dirLight.shadow.camera.bottom = -d;
+      scene.add(dirLight);
+
+      const rimLight = new THREE.PointLight(0x38bdf8, 0.85, 45);
+      rimLight.position.set(0, 8, 6);
+      scene.add(rimLight);
+
+      worldGroup = new THREE.Group();
+      entitiesGroup = new THREE.Group();
+      scene.add(worldGroup);
+      scene.add(entitiesGroup);
+
+      applyGraphicsQuality(gfxQuality);
+    }
+
+    function clearGroup(grp) {
+      if (!grp) return;
+      while (grp.children.length > 0) {
+        grp.remove(grp.children[0]);
+      }
+    }
+
+    function createSquadCounterSprite() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 96;
+      const tex = new THREE.CanvasTexture(canvas);
+      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+      const sprite = new THREE.Sprite(mat);
+      sprite.scale.set(3.2, 1.2, 1);
+      sprite.userData = { canvas, tex };
+      return sprite;
+    }
+
+    function updateSquadCounterSprite(count) {
+      if (!entitiesGroup) return;
+      if (!squadCounterSprite) {
+        squadCounterSprite = createSquadCounterSprite();
+        entitiesGroup.add(squadCounterSprite);
+      }
+      if (!squadCounterSprite.parent) {
+        entitiesGroup.add(squadCounterSprite);
+      }
+      squadCounterSprite.position.set(squadX, 3.35, squadZ);
+      if (lastShownArmyCount === count) return;
+      lastShownArmyCount = count;
+
+      const { canvas, tex } = squadCounterSprite.userData;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.86)';
+      ctx.beginPath();
+      ctx.roundRect(28, 14, 200, 68, 22);
+      ctx.fill();
+
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 4;
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 44px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(String(count), 128, 50);
+      tex.needsUpdate = true;
+    }
+
+    function flashHudArmy(isLoss) {
+      const el = document.getElementById('hudArmy');
+      if (!el) return;
+      el.className = isLoss
+        ? 'text-lg sm:text-xl font-black text-red-400 scale-125 transition-transform duration-150 leading-none'
+        : 'text-lg sm:text-xl font-black text-emerald-400 scale-125 transition-transform duration-150 leading-none';
+      hudPulseTimer = 0.28;
+    }
+
+    function spawnDeathBurst(x, z, count = 4) {
+      if (!entitiesGroup) return;
+      const burst = Math.min(10, Math.max(2, count));
+      for (let i = 0; i < burst; i++) {
+        const p = new THREE.Mesh(
+          new THREE.BoxGeometry(0.24, 0.24, 0.24),
+          new THREE.MeshBasicMaterial({ color: 0xef4444 })
+        );
+        p.position.set(x + (Math.random() - 0.5) * 1.4, 1.1 + Math.random() * 0.8, z + (Math.random() - 0.5) * 1.4);
+        entitiesGroup.add(p);
+        particles.push({
+          mesh: p,
+          vx: (Math.random() - 0.5) * 6,
+          vy: 3.5 + Math.random() * 4.5,
+          vz: (Math.random() - 0.5) * 6,
+          life: 0.55
+        });
+      }
+    }
+
+    function createGateTexture(label, isPositive) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 160;
+      const ctx = canvas.getContext('2d');
+
+      const grad = ctx.createLinearGradient(0, 0, 0, 160);
+      if (isPositive) {
+        grad.addColorStop(0, 'rgba(37, 99, 235, 0.88)');
+        grad.addColorStop(1, 'rgba(6, 182, 212, 0.78)');
+      } else {
+        grad.addColorStop(0, 'rgba(220, 38, 38, 0.90)');
+        grad.addColorStop(1, 'rgba(127, 29, 29, 0.82)');
+      }
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 256, 160);
+
+      ctx.strokeStyle = isPositive ? '#93c5fd' : '#fca5a5';
+      ctx.lineWidth = 10;
+      ctx.strokeRect(5, 5, 246, 150);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 76px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.shadowColor = 'rgba(0,0,0,0.65)';
+      ctx.shadowBlur = 10;
+      ctx.fillText(label, 128, 84);
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.needsUpdate = true;
+      return tex;
+    }
+
+    function createSoldierMesh(weaponId) {
+      const g = new THREE.Group();
+
+      const torsoMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.4, metalness: 0.2 });
+      const torso = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.82, 0.42), torsoMat);
+      torso.position.y = 1.08;
+      torso.castShadow = true;
+      g.add(torso);
+
+      const headMat = new THREE.MeshStandardMaterial({ color: 0xfdba74, roughness: 0.5 });
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 14, 14), headMat);
+      head.position.y = 1.72;
+      head.castShadow = true;
+      g.add(head);
+
+      const helmetMat = new THREE.MeshStandardMaterial({ color: 0x1d4ed8, roughness: 0.3, metalness: 0.4 });
+      const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.31, 14, 12, 0, Math.PI * 2, 0, Math.PI * 0.58), helmetMat);
+      helmet.position.y = 1.76;
+      helmet.castShadow = true;
+      g.add(helmet);
+
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0x0f172a });
+      const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 8), eyeMat);
+      eyeL.position.set(-0.1, 1.73, -0.25);
+      const eyeR = eyeL.clone();
+      eyeR.position.x = 0.1;
+      g.add(eyeL, eyeR);
+
+      const legMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.6 });
+      const legL = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.65, 0.28), legMat);
+      legL.position.set(-0.18, 0.35, 0);
+      legL.castShadow = true;
+      const legR = legL.clone();
+      legR.position.x = 0.18;
+      g.add(legL, legR);
+
+      const gunColor = weaponId === 'laser' ? 0xef4444 : (weaponId === 'plasma' ? 0xa855f7 : (weaponId === 'rifle' ? 0xfacc15 : 0x334155));
+      const gunMat = new THREE.MeshStandardMaterial({ color: gunColor, metalness: 0.6, roughness: 0.25 });
+      const gunLen = weaponId === 'rifle' ? 0.85 : (weaponId === 'plasma' ? 0.92 : (weaponId === 'laser' ? 0.82 : 0.52));
+      const gun = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.16, gunLen), gunMat);
+      gun.position.set(0.38, 1.15, -gunLen * 0.45);
+      gun.castShadow = true;
+      g.add(gun);
+
+      g.userData = { legL, legR, gun };
+      return g;
+    }
+
+    function createEnemyMesh(type, scaleMult) {
+      const root = new THREE.Group();
+      const s = scaleMult || 1;
+
+      if (type === 'snake') {
+        const snakeScale = s * 1.42;
+        const bodyMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.28, metalness: 0.28 });
+        const stripeMat = new THREE.MeshStandardMaterial({ color: 0x84cc16, roughness: 0.35, metalness: 0.2 });
+        const headMat = new THREE.MeshStandardMaterial({ color: 0x166534, roughness: 0.25, metalness: 0.35 });
+
+        const head = new THREE.Mesh(new THREE.BoxGeometry(1.04, 0.7, 1.28), headMat);
+        head.position.set(0, 0.56, 0);
+        head.castShadow = true;
+        root.add(head);
+
+        const hood = new THREE.Mesh(new THREE.BoxGeometry(1.42, 0.3, 0.72), stripeMat);
+        hood.position.set(0, 0.58, 0.22);
+        hood.castShadow = true;
+        root.add(hood);
+
+        const jaw = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.22, 0.88), new THREE.MeshStandardMaterial({ color: 0x7f1d1d, roughness: 0.4 }));
+        jaw.position.set(0, 0.25, 0.14);
+        root.add(jaw);
+
+        const fangMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.2 });
+        const fangL = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.3, 6), fangMat);
+        fangL.position.set(-0.3, 0.38, -0.5);
+        fangL.rotation.x = Math.PI;
+        const fangR = fangL.clone();
+        fangR.position.x = 0.3;
+        root.add(fangL, fangR);
+
+        const tongue = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.04, 0.62), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
+        tongue.position.set(0, 0.38, -0.75);
+        root.add(tongue);
+
+        const eyeMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+        const e1 = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 10), eyeMat);
+        e1.position.set(-0.4, 0.76, -0.25);
+        const e2 = e1.clone();
+        e2.position.x = 0.4;
+        root.add(e1, e2);
+
+        const segments = [];
+        for (let i = 1; i <= 7; i++) {
+          const r = Math.max(0.22, 0.58 - i * 0.048);
+          const segMat = i % 2 === 0 ? bodyMat : stripeMat;
+          const seg = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 12), segMat);
+          seg.scale.set(1.12, 0.92, 1.18);
+          seg.position.set(0, r * 0.95, i * 0.74);
+          seg.castShadow = true;
+          root.add(seg);
+          segments.push(seg);
+        }
+        root.scale.setScalar(snakeScale);
+        root.userData = { segments, jaw, tongue };
+        return root;
+      } else if (type === 'spider') {
+        const spiderScale = s * 1.46;
+        const bodyMat = new THREE.MeshStandardMaterial({ color: 0x581c87, roughness: 0.32, metalness: 0.32 });
+        const markMat = new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0x7f1d1d, emissiveIntensity: 0.4, roughness: 0.35 });
+
+        const abdomen = new THREE.Mesh(new THREE.SphereGeometry(1.04, 14, 14), bodyMat);
+        abdomen.scale.set(1.18, 0.95, 1.35);
+        abdomen.position.set(0, 1.02, 0.46);
+        abdomen.castShadow = true;
+        root.add(abdomen);
+
+        const marking = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.24, 0.9), markMat);
+        marking.position.set(0, 1.82, 0.46);
+        root.add(marking);
+
+        const thorax = new THREE.Mesh(new THREE.SphereGeometry(0.65, 12, 12), bodyMat);
+        thorax.scale.set(1.1, 0.9, 1.15);
+        thorax.position.set(0, 0.8, -0.65);
+        thorax.castShadow = true;
+        root.add(thorax);
+
+        const fangMat = new THREE.MeshStandardMaterial({ color: 0x1e1b4b, metalness: 0.6, roughness: 0.25 });
+        const clawL = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.52, 6), fangMat);
+        clawL.position.set(-0.26, 0.5, -1.2);
+        clawL.rotation.x = Math.PI * 0.82;
+        const clawR = clawL.clone();
+        clawR.position.x = 0.26;
+        root.add(clawL, clawR);
+
+        const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff2a2a });
+        for (let i = 0; i < 6; i++) {
+          const eye = new THREE.Mesh(new THREE.SphereGeometry(i < 2 ? 0.12 : 0.08, 8, 8), eyeMat);
+          eye.position.set(-0.4 + i * 0.16, 0.94 + (i % 2) * 0.09, -1.18);
+          root.add(eye);
+        }
+
+        const legs = [];
+        const legMat = new THREE.MeshStandardMaterial({ color: 0x2e1065, roughness: 0.4, metalness: 0.3 });
+        for (let side of [-1, 1]) {
+          for (let l = 0; l < 4; l++) {
+            const pivot = new THREE.Group();
+            const zOff = -0.9 + l * 0.52;
+            pivot.position.set(side * 0.62, 0.82, zOff);
+            pivot.rotation.y = side * (0.45 - l * 0.22);
+
+            const upperLeg = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.19, 0.2), legMat);
+            upperLeg.position.set(side * 0.52, 0.33, 0);
+            upperLeg.rotation.z = side * 0.58;
+            upperLeg.castShadow = true;
+            pivot.add(upperLeg);
+
+            const lowerLeg = new THREE.Mesh(new THREE.BoxGeometry(0.17, 1.1, 0.17), markMat);
+            lowerLeg.position.set(side * 1.0, 0.05, 0);
+            lowerLeg.rotation.z = side * 0.22;
+            lowerLeg.castShadow = true;
+            pivot.add(lowerLeg);
+
+            root.add(pivot);
+            legs.push({ mesh: pivot, side, idx: l });
+          }
+        }
+        root.scale.setScalar(spiderScale);
+        root.userData = { legs };
+        return root;
+      } else if (type === 'mutant') {
+        const mutMat = new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.35, metalness: 0.3 });
+        const body = new THREE.Mesh(new THREE.BoxGeometry(1.3, 1.7, 1.0), mutMat);
+        body.position.y = 1.22;
+        body.castShadow = true;
+        root.add(body);
+
+        const head = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.7, 0.72), new THREE.MeshStandardMaterial({ color: 0x7f1d1d }));
+        head.position.y = 2.4;
+        head.castShadow = true;
+        root.add(head);
+
+        const armMat = new THREE.MeshStandardMaterial({ color: 0x991b1b });
+        const armL = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.25, 0.4), armMat);
+        armL.position.set(-0.88, 1.32, 0);
+        const armR = armL.clone();
+        armR.position.x = 0.88;
+        root.add(armL, armR);
+        root.userData = { armL, armR };
+      } else {
+        const zMat = new THREE.MeshStandardMaterial({ color: 0x4d7c0f, roughness: 0.55 });
+        const shirtMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.6 });
+        const body = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.95, 0.45), shirtMat);
+        body.position.y = 1.05;
+        body.castShadow = true;
+        root.add(body);
+
+        const head = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.54, 0.54), zMat);
+        head.position.y = 1.82;
+        head.castShadow = true;
+        root.add(head);
+
+        const armL = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.72, 0.24), zMat);
+        armL.position.set(-0.52, 1.22, -0.25);
+        armL.rotation.x = -0.9;
+        const armR = armL.clone();
+        armR.position.x = 0.52;
+        root.add(armL, armR);
+        root.userData = { armL, armR };
+      }
+
+      root.scale.setScalar(s);
+      return root;
+    }
+
+    function createBossMesh(bossType, isCentury) {
+      const g = new THREE.Group();
+      const baseScale = isCentury ? 2.35 : 1.9;
+
+      const colorMap = {
+        zombie_boss: 0x65a30d,
+        snake_boss: 0x10b981,
+        spider_boss: 0xa855f7,
+        mutant_boss: 0xef4444,
+        titan_boss: 0xf59e0b,
+        cyber_boss: 0x06b6d4
+      };
+      const mainColor = colorMap[bossType] || 0xef4444;
+
+      const torso = new THREE.Mesh(
+        new THREE.BoxGeometry(2.6, 3.2, 2.0),
+        new THREE.MeshStandardMaterial({ color: mainColor, roughness: 0.35, metalness: 0.35 })
+      );
+      torso.position.y = 2.4;
+      torso.castShadow = true;
+      g.add(torso);
+
+      const head = new THREE.Mesh(
+        new THREE.BoxGeometry(1.5, 1.45, 1.5),
+        new THREE.MeshStandardMaterial({ color: 0x1e1b4b, roughness: 0.4, metalness: 0.5 })
+      );
+      head.position.y = 4.75;
+      head.castShadow = true;
+      g.add(head);
+
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff2a2a });
+      const eL = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 10), eyeMat);
+      eL.position.set(-0.38, 4.82, 0.76);
+      const eR = eL.clone();
+      eR.position.x = 0.38;
+      g.add(eL, eR);
+
+      const armL = new THREE.Mesh(
+        new THREE.BoxGeometry(0.85, 2.5, 0.85),
+        new THREE.MeshStandardMaterial({ color: mainColor, roughness: 0.4 })
+      );
+      armL.position.set(-1.8, 2.5, 0);
+      armL.castShadow = true;
+      const armR = armL.clone();
+      armR.position.x = 1.8;
+      g.add(armL, armR);
+
+      g.scale.setScalar(baseScale);
+      g.userData = { armL, armR };
+      return g;
+    }
+
+    function createTrapMesh(trapType, width, lossLabel) {
+      const g = new THREE.Group();
+      const matRed = new THREE.MeshStandardMaterial({ color: 0xdc2626, metalness: 0.55, roughness: 0.3 });
+      const matMetal = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.75, roughness: 0.25 });
+
+      if (trapType === 'spinner') {
+        const bar = new THREE.Mesh(new THREE.BoxGeometry(width, 0.42, 0.45), matRed);
+        bar.position.y = 0.55;
+        bar.castShadow = true;
+        g.add(bar);
+        const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 1.1, 12), matMetal);
+        hub.position.y = 0.55;
+        g.add(hub);
+        g.userData = { spinnerMesh: bar };
+      } else if (trapType === 'popup') {
+        const base = new THREE.Mesh(new THREE.BoxGeometry(width, 0.22, 1.6), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
+        base.position.y = 0.11;
+        g.add(base);
+        const spikesGroup = new THREE.Group();
+        const count = Math.max(3, Math.floor(width / 0.9));
+        for (let i = 0; i < count; i++) {
+          const sp = new THREE.Mesh(new THREE.ConeGeometry(0.24, 1.15, 6), matRed);
+          const xPos = -width * 0.42 + (i / Math.max(1, count - 1)) * (width * 0.84);
+          sp.position.set(xPos, 0.55, 0);
+          sp.castShadow = true;
+          spikesGroup.add(sp);
+        }
+        g.add(spikesGroup);
+        g.userData = { spikesGroup };
+      } else {
+        const base = new THREE.Mesh(new THREE.BoxGeometry(width, 0.25, 1.6), new THREE.MeshStandardMaterial({ color: 0x0f172a }));
+        base.position.y = 0.12;
+        g.add(base);
+        const count = Math.max(4, Math.floor(width / 0.75));
+        for (let i = 0; i < count; i++) {
+          const sp = new THREE.Mesh(new THREE.ConeGeometry(0.25, 1.05, 6), matMetal);
+          const xPos = -width * 0.44 + (i / Math.max(1, count - 1)) * (width * 0.88);
+          sp.position.set(xPos, 0.62, 0);
+          sp.castShadow = true;
+          g.add(sp);
+        }
+      }
+
+      if (lossLabel) {
+        const tex = createGateTexture(lossLabel, false);
+        const badge = new THREE.Mesh(
+          new THREE.PlaneGeometry(Math.min(2.6, width * 0.58), 1.35),
+          new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide })
+        );
+        badge.position.set(0, 1.65, 0);
+        g.add(badge);
+      }
+      return g;
+    }
+
+    function buildLevel(stageCfg) {
+      initThreeScene();
+      currentStageCfg = stageCfg;
+
+      clearGroup(worldGroup);
+      clearGroup(entitiesGroup);
+      soldierMeshes = [];
+      squadCounterSprite = null;
+      lastShownArmyCount = -1;
+      lastHudArmyValue = -1;
+      gates = [];
+      traps = [];
+      enemies = [];
+      bullets = [];
+      enemyProjectiles = [];
+      particles = [];
+      boss = null;
+      bossTriggered = false;
+
+      squadX = 0;
+      squadZ = 0;
+      armyCount = 1;
+      runCoins = 0;
+      fireTimer = 0;
+      simTime = 0;
+      invulnTimer = 0;
+      gameEnded = false;
+
+      const w = stageCfg.world;
+      scene.background = new THREE.Color(w.skyColor);
+      scene.fog = new THREE.FogExp2(w.fogColor, 0.0085);
+
+      const roadLen = stageCfg.length + 70;
+      const ground = new THREE.Mesh(
+        new THREE.PlaneGeometry(140, roadLen + 80),
+        new THREE.MeshStandardMaterial({ color: w.sideColor, roughness: 0.9 })
+      );
+      ground.rotation.x = -Math.PI / 2;
+      ground.position.set(0, -0.05, -roadLen * 0.45);
+      ground.receiveShadow = true;
+      worldGroup.add(ground);
+
+      const road = new THREE.Mesh(
+        new THREE.BoxGeometry(ROAD_HALF_WIDTH * 2, 0.3, roadLen),
+        new THREE.MeshStandardMaterial({ color: w.roadColor, roughness: 0.65, metalness: 0.15 })
+      );
+      road.position.set(0, -0.15, -roadLen * 0.45);
+      road.receiveShadow = true;
+      worldGroup.add(road);
+
+      const railMat = new THREE.MeshStandardMaterial({ color: w.accentColor, emissive: w.accentColor, emissiveIntensity: 0.35 });
+      for (const side of [-1, 1]) {
+        const rail = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.65, roadLen), railMat);
+        rail.position.set(side * (ROAD_HALF_WIDTH + 0.14), 0.25, -roadLen * 0.45);
+        worldGroup.add(rail);
+      }
+
+      const propGeo = new THREE.BoxGeometry(1.4, 3.2, 1.4);
+      const propMat = new THREE.MeshStandardMaterial({ color: w.sideColor, roughness: 0.7 });
+      for (let z = -12; z > -stageCfg.length; z -= 18) {
+        for (const side of [-1, 1]) {
+          const prop = new THREE.Mesh(propGeo, propMat);
+          prop.position.set(side * (ROAD_HALF_WIDTH + 4.5 + Math.abs(Math.sin(z)) * 3), 1.5, z);
+          prop.castShadow = gfxQuality !== 'low';
+          worldGroup.add(prop);
+        }
+      }
+
+      const posGates = [
+        { label: '+5', op: 'add', val: 5 },
+        { label: '+10', op: 'add', val: 10 },
+        { label: '+20', op: 'add', val: 20 },
+        { label: '×2', op: 'mul', val: 2 },
+        { label: '×3', op: 'mul', val: 3 }
+      ];
+      const negGates = [
+        { label: '-2', op: 'sub', val: 2 },
+        { label: '-5', op: 'sub', val: 5 },
+        { label: '-10', op: 'sub', val: 10 },
+        { label: '-20', op: 'sub', val: 20 },
+        { label: '÷2', op: 'div', val: 2 }
+      ];
+
+      const stageFactor = Math.min(1, (stageCfg.stage - 1) / 80);
+      let cursorZ = -24;
+      const endLimit = -(stageCfg.length - 36);
+
+      while (cursorZ > endLimit) {
+        const patternRoll = Math.random();
+        let leftSpec, rightSpec;
+        if (patternRoll < 0.55 - stageFactor * 0.14) {
+          leftSpec = posGates[Math.floor(Math.random() * posGates.length)];
+          rightSpec = negGates[Math.floor(Math.random() * negGates.length)];
+        } else if (patternRoll < 0.8) {
+          leftSpec = posGates[Math.floor(Math.random() * posGates.length)];
+          rightSpec = posGates[Math.floor(Math.random() * posGates.length)];
+        } else {
+          leftSpec = negGates[Math.floor(Math.random() * negGates.length)];
+          rightSpec = negGates[Math.floor(Math.random() * negGates.length)];
+        }
+        if (Math.random() < 0.5) {
+          const tmp = leftSpec;
+          leftSpec = rightSpec;
+          rightSpec = tmp;
+        }
+
+        const gateWidth = ROAD_HALF_WIDTH - 0.35;
+        for (const [idx, spec] of [leftSpec, rightSpec].entries()) {
+          const isPos = spec.op === 'add' || spec.op === 'mul';
+          const tex = createGateTexture(spec.label, isPos);
+          const panel = new THREE.Mesh(
+            new THREE.PlaneGeometry(gateWidth, 3.4),
+            new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide })
+          );
+          const gx = idx === 0 ? -gateWidth * 0.5 - 0.1 : gateWidth * 0.5 + 0.1;
+          panel.position.set(gx, 1.85, cursorZ);
+          worldGroup.add(panel);
+          gates.push({
+            z: cursorZ,
+            minX: gx - gateWidth * 0.5,
+            maxX: gx + gateWidth * 0.5,
+            spec,
+            triggered: false,
+            mesh: panel
+          });
+        }
+
+        const waveZ = cursorZ - 11;
+        const progressRatio = Math.min(1, Math.abs(cursorZ) / Math.max(1, stageCfg.length));
+        const maxWaveCount = Math.min(18, 6 + Math.floor(stageCfg.stage / 7) + Math.floor(Math.random() * 4));
+        const minStartCount = progressRatio < 0.2 ? 4 : (progressRatio < 0.45 ? 6 : 8);
+        const waveCount = Math.max(minStartCount, Math.round(maxWaveCount * (0.68 + progressRatio * 0.32)));
+        const pool = stageCfg.enemyTypes;
+        for (let m = 0; m < waveCount; m++) {
+          const eType = pool[Math.floor(Math.random() * pool.length)];
+          const ex = (Math.random() * 2 - 1) * (ROAD_HALF_WIDTH - 1.3);
+          const ez = waveZ - m * 1.45 - Math.random() * 1.6;
+          const baseHpMap = { zombie: 62, snake: 68, spider: 130, mutant: 210 };
+          const baseDmgMap = { zombie: 1, snake: 2, spider: 2, mutant: 4 };
+          const baseSpdMap = { zombie: 4.1, snake: 5.4, spider: 5.0, mutant: 3.9 };
+
+          const maxHp = Math.round((baseHpMap[eType] || 75) * stageCfg.enemyHpMult);
+          const dmg = Math.max(1, Math.round((baseDmgMap[eType] || 1) * stageCfg.enemyDmgMult));
+          const spd = (baseSpdMap[eType] || 4.1) * Math.min(2.2, 1.0 + stageCfg.enemySpeedMult * 0.24);
+
+          const eMesh = createEnemyMesh(eType, stageCfg.enemyScaleMult * (eType === 'mutant' ? 1.3 : 1.0));
+          eMesh.position.set(ex, 0, ez);
+          entitiesGroup.add(eMesh);
+
+          enemies.push({
+            type: eType,
+            x: ex,
+            z: ez,
+            vx: (Math.random() < 0.5 ? -1 : 1) * (1.5 + Math.random() * 1.7),
+            hp: maxHp,
+            maxHp,
+            dmg,
+            speed: spd,
+            attackCooldown: 0.75 + Math.random() * 0.8,
+            mesh: eMesh,
+            phase: Math.random() * Math.PI * 2
+          });
+        }
+
+        const trapZ = cursorZ - 18.5;
+        const trapRoll = Math.random();
+        let tierType = 'normal';
+        let lossCount = 5;
+        let trapWidth = 4.6;
+
+        if (trapRoll > 0.72 - stageFactor * 0.14) {
+          tierType = 'heavy20';
+          lossCount = 20;
+          trapWidth = 5.4;
+        } else if (trapRoll > 0.42 - stageFactor * 0.12) {
+          tierType = 'medium10';
+          lossCount = 10;
+          trapWidth = 5.0;
+        } else if (trapRoll > 0.2) {
+          tierType = 'normal5';
+          lossCount = 5;
+          trapWidth = 4.6;
+        } else {
+          tierType = 'light3';
+          lossCount = 3;
+          trapWidth = 4.4;
+        }
+
+        const trapKind = w.trapPool[Math.floor(Math.random() * w.trapPool.length)];
+        const tx = (Math.random() * 2 - 1) * (ROAD_HALF_WIDTH - trapWidth * 0.55);
+        const tMesh = createTrapMesh(trapKind, trapWidth, `-${lossCount}`);
+        tMesh.position.set(tx, 0, trapZ);
+        worldGroup.add(tMesh);
+
+        traps.push({
+          kind: trapKind,
+          tier: tierType,
+          lossCount,
+          x: tx,
+          baseX: tx,
+          z: trapZ,
+          halfW: trapWidth * 0.5,
+          moveAmp: trapKind === 'spinner' || Math.random() < 0.4 ? 2.1 : 0,
+          moveSpeed: 1.6 + Math.random() * 1.2,
+          phase: Math.random() * Math.PI * 2,
+          triggered: false,
+          mesh: tMesh
+        });
+
+        cursorZ -= 31;
+      }
+
+      bossSpawnZ = -(stageCfg.length - 12);
+      const bMesh = createBossMesh(w.bossType, stageCfg.isCenturyBoss);
+      bMesh.position.set(0, 0, bossSpawnZ);
+      entitiesGroup.add(bMesh);
+
+      boss = {
+        name: stageCfg.bossName,
+        type: w.bossType,
+        attackStyle: w.bossAttackStyle,
+        x: 0,
+        z: bossSpawnZ,
+        hp: stageCfg.bossHp,
+        maxHp: stageCfg.bossHp,
+        dmg: stageCfg.bossDamage,
+        attackTimer: 1.8,
+        enraged: false,
+        mesh: bMesh
+      };
+
+      syncSoldierSquadMeshes(0);
+    }
+
+    let soldierMeshes = [];
+
+    function syncSoldierSquadMeshes(dt) {
+      if (!entitiesGroup) return;
+      const weaponId = currentUser ? currentUser.equippedWeapon : 'pistol';
+      const visibleCount = Math.min(250, Math.max(0, Math.floor(armyCount)));
+
+      while (soldierMeshes.length < visibleCount) {
+        const m = createSoldierMesh(weaponId);
+        entitiesGroup.add(m);
+        soldierMeshes.push(m);
+      }
+      while (soldierMeshes.length > visibleCount) {
+        const old = soldierMeshes.pop();
+        entitiesGroup.remove(old);
+      }
+
+      const cols = Math.min(12, Math.max(1, Math.ceil(Math.sqrt(Math.max(1, visibleCount)))));
+      const spacingX = visibleCount > 64 ? 0.68 : 0.85;
+      const spacingZ = visibleCount > 64 ? 0.72 : 0.9;
+
+      for (let i = 0; i < soldierMeshes.length; i++) {
+        const m = soldierMeshes[i];
+        const row = Math.floor(i / cols);
+        const col = i % cols;
+        const centerOffset = (cols - 1) * 0.5;
+        const ox = (col - centerOffset) * spacingX;
+        const oz = row * spacingZ;
+
+        m.position.x += ((squadX + ox) - m.position.x) * Math.min(1, dt * 16 || 1);
+        m.position.z = squadZ + oz;
+
+        const runSwing = Math.sin(simTime * 14 + i * 0.9) * 0.65;
+        if (m.userData && m.userData.legL && m.userData.legR) {
+          m.userData.legL.rotation.x = runSwing;
+          m.userData.legR.rotation.x = -runSwing;
+        }
+      }
+
+      updateSquadCounterSprite(Math.max(0, Math.floor(armyCount)));
+    }
+
+    function applyGateEffect(spec) {
+      const prev = armyCount;
+      if (spec.op === 'add') armyCount += spec.val;
+      else if (spec.op === 'sub') armyCount -= spec.val;
+      else if (spec.op === 'mul') armyCount *= spec.val;
+      else if (spec.op === 'div') armyCount = Math.floor(armyCount / spec.val);
+
+      armyCount = Math.max(0, Math.floor(armyCount));
+      const diff = armyCount - prev;
+      if (diff < 0) spawnDeathBurst(squadX, squadZ, Math.abs(diff));
+      const label = diff >= 0 ? `${spec.label} (${armyCount})` : `${spec.label} (${armyCount})`;
+      spawnFloatingText(label, diff >= 0 ? 'text-cyan-300' : 'text-red-400', squadX, 3.5, squadZ - 2);
+      if (armyCount <= 0) {
+        finishGame(false, 'Darvozadan o‘tganda barcha askarlar tugadi!');
+      }
+    }
+
+    function applyTrapHit(trap) {
+      if (trap.triggered) return;
+      trap.triggered = true;
+      const prev = armyCount;
+      const penalty = Math.max(1, Math.floor(trap.lossCount));
+      armyCount = Math.max(0, Math.floor(armyCount - penalty));
+      const lostActual = Math.max(0, prev - armyCount);
+      spawnDeathBurst(squadX, squadZ, lostActual);
+      spawnFloatingText(`-${penalty} ASKAR (TUZOQ!)`, 'text-red-500', squadX, 3.8, squadZ - 2);
+      invulnTimer = 0.25;
+      if (armyCount <= 0) {
+        finishGame(false, `Tuzoq (-${penalty}) armiyani yo‘q qildi! (${lostActual} askar halok bo‘ldi)`);
+      }
+    }
+
+    function firePlayerWeapons(dt) {
+      if (!currentUser || armyCount <= 0) return;
+      const wObj = WEAPONS.find(w => w.id === currentUser.equippedWeapon) || WEAPONS[0];
+      fireTimer -= dt;
+      if (fireTimer > 0) return;
+      fireTimer = wObj.fireInterval;
+
+      const shooters = Math.min(10, armyCount);
+      const totalDmg = wObj.damage * 0.9 * (1 + Math.min(28, armyCount - 1) * 0.22);
+
+      for (let s = 0; s < shooters; s++) {
+        const spreadX = (s - (shooters - 1) * 0.5) * 0.35;
+        const bMesh = new THREE.Mesh(
+          new THREE.SphereGeometry(wObj.id === 'plasma' ? 0.26 : 0.15, 8, 8),
+          new THREE.MeshBasicMaterial({ color: wObj.bulletColor })
+        );
+        bMesh.position.set(squadX + spreadX, 1.3, squadZ - 1.2);
+        entitiesGroup.add(bMesh);
+        bullets.push({
+          x: squadX + spreadX,
+          y: 1.3,
+          z: squadZ - 1.2,
+          vz: -wObj.bulletSpeed,
+          dmgPerShot: totalDmg / shooters,
+          weaponId: wObj.id,
+          mesh: bMesh
+        });
+      }
+    }
+
+    function spawnEnemyProjectile(x, y, z, vx, vz, dmg, colorHex = 0xa855f7) {
+      const m = new THREE.Mesh(
+        new THREE.SphereGeometry(0.28, 8, 8),
+        new THREE.MeshBasicMaterial({ color: colorHex })
+      );
+      m.position.set(x, y, z);
+      entitiesGroup.add(m);
+      enemyProjectiles.push({ x, y, z, vx, vz, dmg, mesh: m });
+    }
+
+    function finishGame(isWin, reasonText) {
+      if (gameEnded) return;
+      gameEnded = true;
+      gameActive = false;
+
+      let earned = isWin ? currentStageCfg.rewardCoins : Math.floor(runCoins * 0.6);
+      earned += runCoins;
+
+      if (currentUser) {
+        currentUser.coins += earned;
+        if (isWin && currentStageCfg.stage >= currentUser.unlockedStage && currentStageCfg.stage < MAX_STAGES) {
+          currentUser.unlockedStage = currentStageCfg.stage + 1;
+        }
+        syncCurrentUser();
+      }
+
+      document.getElementById('hud').classList.add('hidden');
+      const modal = document.getElementById('resultModal');
+      const badge = document.getElementById('resBadge');
+      const title = document.getElementById('resTitle');
+      const desc = document.getElementById('resDesc');
+      const btnNext = document.getElementById('btnNextStage');
+
+      if (isWin) {
+        badge.textContent = 'BOSQICH YAKUNLANDI';
+        badge.className = 'inline-block px-3 py-1 rounded-full text-xs font-black uppercase bg-emerald-600/25 text-emerald-300 border border-emerald-400/40';
+        title.textContent = 'G‘ALABA!';
+        desc.textContent = reasonText || `${currentStageCfg.bossName} mag‘lub etildi!`;
+        if (currentStageCfg.stage < MAX_STAGES) {
+          btnNext.classList.remove('hidden');
+        } else {
+          btnNext.classList.add('hidden');
+        }
+      } else {
+        badge.textContent = 'MAG‘LUBIYAT';
+        badge.className = 'inline-block px-3 py-1 rounded-full text-xs font-black uppercase bg-red-600/25 text-red-300 border border-red-400/40';
+        title.textContent = 'ARMIYA YIQILDI';
+        desc.textContent = reasonText || 'Askarlar soni 0 ga tushdi. Qayta urinib ko‘ring!';
+        btnNext.classList.add('hidden');
+      }
+
+      document.getElementById('resCoins').textContent = `+${earned}`;
+      document.getElementById('resSoldiers').textContent = String(Math.max(0, Math.floor(armyCount)));
+      modal.classList.remove('hidden');
+    }
+
+    function updateSimulation(dt) {
+      if (!gameActive || gameEnded || !currentUser) return;
+      simTime += dt;
+      if (invulnTimer > 0) invulnTimer -= dt;
+
+      const steerDir = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+      if (steerDir !== 0) {
+        squadX += steerDir * 11.8 * dt;
+      }
+      squadX = Math.max(-(ROAD_HALF_WIDTH - 1.1), Math.min(ROAD_HALF_WIDTH - 1.1, squadX));
+
+      const distToBoss = boss ? (squadZ - boss.z) : 999;
+      if (distToBoss <= 15) {
+        bossTriggered = true;
+        document.getElementById('bossBarWrap').classList.remove('hidden');
+        squadZ -= forwardSpeed * 0.22 * dt;
+      } else {
+        squadZ -= forwardSpeed * dt;
+      }
+
+      syncSoldierSquadMeshes(dt);
+      firePlayerWeapons(dt);
+
+      for (const g of gates) {
+        if (!g.triggered && Math.abs(squadZ - g.z) < 1.35) {
+          if (squadX >= g.minX - 0.55 && squadX <= g.maxX + 0.55) {
+            g.triggered = true;
+            g.mesh.visible = false;
+            applyGateEffect(g.spec);
+            if (gameEnded) return;
+          }
+        }
+      }
+
+      for (const tr of traps) {
+        if (tr.moveAmp > 0) {
+          tr.x = tr.baseX + Math.sin(simTime * tr.moveSpeed + tr.phase) * tr.moveAmp;
+          tr.x = Math.max(-(ROAD_HALF_WIDTH - tr.halfW), Math.min(ROAD_HALF_WIDTH - tr.halfW, tr.x));
+          tr.mesh.position.x = tr.x;
+        }
+        if (tr.kind === 'spinner' && tr.mesh.userData && tr.mesh.userData.spinnerMesh) {
+          tr.mesh.userData.spinnerMesh.rotation.y += 4.2 * dt;
+        }
+        if (tr.kind === 'popup' && tr.mesh.userData && tr.mesh.userData.spikesGroup) {
+          const cycle = Math.sin(simTime * 3.2 + tr.phase);
+          tr.mesh.userData.spikesGroup.position.y = cycle > 0 ? 0.25 : -0.55;
+        }
+
+        if (!tr.triggered && Math.abs(squadZ - tr.z) < 1.35 && Math.abs(squadX - tr.x) < tr.halfW + 0.65) {
+          applyTrapHit(tr);
+          if (gameEnded) return;
+        }
+      }
+
+      for (let i = enemies.length - 1; i >= 0; i--) {
+        const en = enemies[i];
+        en.phase += dt * 7;
+
+        if (en.z < squadZ + 18 && en.z > squadZ - 55) {
+          en.z += en.speed * dt;
+          if (en.type === 'snake') {
+            en.x += Math.sin(en.phase) * 4.0 * dt;
+            if (en.mesh.userData && en.mesh.userData.segments) {
+              en.mesh.userData.segments.forEach((seg, idx) => {
+                seg.position.x = Math.sin(en.phase - idx * 0.65) * 0.85;
+              });
+            }
+            if (en.mesh.userData && en.mesh.userData.jaw) {
+              en.mesh.userData.jaw.rotation.x = Math.max(0, Math.sin(en.phase * 1.4)) * 0.42;
+            }
+            if (en.mesh.userData && en.mesh.userData.tongue) {
+              en.mesh.userData.tongue.position.z = -0.75 - Math.abs(Math.sin(en.phase * 2.5)) * 0.35;
+            }
+          } else if (en.type === 'spider') {
+            en.x += Math.cos(en.phase * 0.9) * 3.1 * dt;
+            if (en.mesh.userData && en.mesh.userData.legs) {
+              en.mesh.userData.legs.forEach(lObj => {
+                const swing = Math.sin(en.phase * 1.8 + lObj.idx * 1.1) * 0.45;
+                lObj.mesh.rotation.z = lObj.side * swing * 0.55;
+                lObj.mesh.rotation.x = swing * 0.35;
+              });
+            }
+            en.attackCooldown -= dt;
+            if (en.attackCooldown <= 0) {
+              en.attackCooldown = 2.25;
+              const dz = (squadZ - en.z) || 1;
+              const dx = (squadX - en.x) / Math.abs(dz);
+              spawnEnemyProjectile(en.x, 1.25, en.z + 1.1, dx * 13, 15, Math.max(1, Math.round(en.dmg * 0.75)), 0xc084fc);
+            }
+          } else {
+            en.x += en.vx * dt;
+            if (Math.abs(en.x) > ROAD_HALF_WIDTH - 1.2) en.vx *= -1;
+          }
+          en.x = Math.max(-(ROAD_HALF_WIDTH - 1.0), Math.min(ROAD_HALF_WIDTH - 1.0, en.x));
+        }
+
+        en.mesh.position.set(en.x, 0, en.z);
+
+        if (Math.abs(en.z - squadZ) < 1.55 && Math.abs(en.x - squadX) < 1.85) {
+          const loss = Math.max(1, Math.min(armyCount, en.dmg));
+          armyCount -= loss;
+          spawnDeathBurst(en.x, en.z, loss);
+          spawnFloatingText(`-${loss}`, 'text-red-400', en.x, 2.4, en.z);
+          entitiesGroup.remove(en.mesh);
+          enemies.splice(i, 1);
+          if (armyCount <= 0) {
+            finishGame(false, 'Maxluqlar armiyani mag‘lub etdi!');
+            return;
+          }
+        } else if (en.z > squadZ + 10) {
+          entitiesGroup.remove(en.mesh);
+          enemies.splice(i, 1);
+        }
+      }
+
+      if (boss && boss.hp > 0 && bossTriggered) {
+        const hpRatio = boss.hp / boss.maxHp;
+        if (hpRatio <= 0.5 && !boss.enraged) {
+          boss.enraged = true;
+          spawnFloatingText('BOSS G‘AZABLANDI!', 'text-red-500', boss.x, 6.2, boss.z);
+        }
+
+        const bossMoveSpeed = boss.enraged ? 3.8 : 2.2;
+        boss.x += Math.sin(simTime * (boss.enraged ? 2.2 : 1.4)) * bossMoveSpeed * dt;
+        boss.x = Math.max(-(ROAD_HALF_WIDTH - 2.2), Math.min(ROAD_HALF_WIDTH - 2.2, boss.x));
+        boss.mesh.position.set(boss.x, 0, boss.z);
+
+        if (boss.mesh.userData && boss.mesh.userData.armL && boss.mesh.userData.armR) {
+          const swing = Math.sin(simTime * (boss.enraged ? 7 : 4)) * 0.7;
+          boss.mesh.userData.armL.rotation.x = swing;
+          boss.mesh.userData.armR.rotation.x = -swing;
+        }
+
+        boss.attackTimer -= dt * (boss.enraged ? 1.3 : 1.0);
+        if (boss.attackTimer <= 0) {
+          boss.attackTimer = 2.2;
+          const countProj = boss.enraged ? 2 : 1;
+          for (let p = 0; p < countProj; p++) {
+            const spread = (p - (countProj - 1) * 0.5) * 4.0;
+            const dx = ((squadX - boss.x) / 14) + spread * 0.1;
+            spawnEnemyProjectile(boss.x, 2.5, boss.z + 2.0, dx * 9, 14.5, Math.max(1, Math.round(boss.dmg * 0.08)), 0xff3b3b);
+          }
+        }
+
+        if (Math.abs(squadZ - boss.z) < 4.2) {
+          const hitLoss = Math.max(1, Math.round(boss.dmg * 0.12));
+          armyCount = Math.max(0, armyCount - hitLoss);
+          spawnDeathBurst(squadX, squadZ, hitLoss);
+          spawnFloatingText(`-${hitLoss} BOSS ZARBA!`, 'text-red-500', squadX, 4.0, squadZ - 2);
+          if (armyCount <= 0) {
+            finishGame(false, `${boss.name} armiyani yo‘q qildi!`);
+            return;
+          }
+        }
+
+        document.getElementById('bossTitle').textContent = boss.name + (boss.enraged ? ' [G‘AZABLANGAN]' : '');
+        document.getElementById('bossHpLabel').textContent = `${Math.max(0, Math.ceil(boss.hp))} / ${boss.maxHp}`;
+        document.getElementById('bossHpFill').style.width = `${Math.max(0, (boss.hp / boss.maxHp) * 100)}%`;
+      }
+
+      for (let i = enemyProjectiles.length - 1; i >= 0; i--) {
+        const pr = enemyProjectiles[i];
+        pr.x += pr.vx * dt;
+        pr.z += pr.vz * dt;
+        pr.mesh.position.set(pr.x, pr.y, pr.z);
+
+        if (Math.abs(pr.z - squadZ) < 1.3 && Math.abs(pr.x - squadX) < 1.8) {
+          const loss = Math.max(1, Math.min(armyCount, pr.dmg));
+          armyCount -= loss;
+          spawnDeathBurst(pr.x, pr.z, loss);
+          spawnFloatingText(`-${loss}`, 'text-purple-400', pr.x, 2.2, pr.z);
+          entitiesGroup.remove(pr.mesh);
+          enemyProjectiles.splice(i, 1);
+          if (armyCount <= 0) {
+            finishGame(false, 'Dushman hujumi natijasida askarlar tugadi!');
+            return;
+          }
+        } else if (pr.z > squadZ + 12 || Math.abs(pr.x) > 15) {
+          entitiesGroup.remove(pr.mesh);
+          enemyProjectiles.splice(i, 1);
+        }
+      }
+
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        const b = bullets[i];
+        b.z += b.vz * dt;
+        b.mesh.position.set(b.x, b.y, b.z);
+
+        let hit = false;
+
+        for (let eIdx = enemies.length - 1; eIdx >= 0; eIdx--) {
+          const en = enemies[eIdx];
+          if (Math.abs(b.z - en.z) < 1.45 && Math.abs(b.x - en.x) < 1.25 * currentStageCfg.enemyScaleMult) {
+            const eff = getWeaponEffectiveness(b.weaponId, en.type, false);
+            en.hp -= b.dmgPerShot * eff;
+            hit = true;
+            if (en.hp <= 0) {
+              runCoins += 3;
+              entitiesGroup.remove(en.mesh);
+              enemies.splice(eIdx, 1);
+            }
+            break;
+          }
+        }
+
+        if (!hit && boss && boss.hp > 0 && Math.abs(b.z - boss.z) < 3.2 && Math.abs(b.x - boss.x) < 3.6) {
+          const eff = getWeaponEffectiveness(b.weaponId, boss.type, true);
+          boss.hp -= b.dmgPerShot * eff;
+          hit = true;
+          if (boss.hp <= 0) {
+            boss.hp = 0;
+            entitiesGroup.remove(boss.mesh);
+            finishGame(true, `${boss.name} yo‘q qilindi! Mukofot qo‘shildi.`);
+            return;
+          }
+        }
+
+        if (hit || b.z < squadZ - 75) {
+          entitiesGroup.remove(b.mesh);
+          bullets.splice(i, 1);
+        }
+      }
+
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const pt = particles[i];
+        pt.life -= dt;
+        pt.vy -= 14 * dt;
+        pt.mesh.position.x += pt.vx * dt;
+        pt.mesh.position.y = Math.max(0.1, pt.mesh.position.y + pt.vy * dt);
+        pt.mesh.position.z += pt.vz * dt;
+        if (pt.life <= 0) {
+          entitiesGroup.remove(pt.mesh);
+          particles.splice(i, 1);
+        }
+      }
+
+      const currentRoundedArmy = Math.max(0, Math.floor(armyCount));
+      if (lastHudArmyValue !== -1 && currentRoundedArmy !== lastHudArmyValue) {
+        flashHudArmy(currentRoundedArmy < lastHudArmyValue);
+      }
+      lastHudArmyValue = currentRoundedArmy;
+
+      if (hudPulseTimer > 0) {
+        hudPulseTimer -= dt;
+        if (hudPulseTimer <= 0) {
+          const hudArmyEl = document.getElementById('hudArmy');
+          if (hudArmyEl) {
+            hudArmyEl.className = 'text-lg sm:text-xl font-black text-blue-400 leading-none';
+          }
+        }
+      }
+
+      camera.position.x += (squadX * 0.72 - camera.position.x) * Math.min(1, dt * 8);
+      camera.position.y = 11.2;
+      camera.position.z = squadZ + 17.5;
+      camera.lookAt(squadX * 0.55, 2.0, squadZ - 15);
+
+      if (dirLight) {
+        dirLight.position.set(squadX + 16, 30, squadZ + 14);
+        dirLight.target.position.set(squadX, 0, squadZ - 12);
+        dirLight.target.updateMatrixWorld();
+      }
+
+      const pct = Math.max(0, Math.min(100, Math.round((Math.abs(squadZ) / Math.max(1, Math.abs(bossSpawnZ))) * 100)));
+      document.getElementById('hudProgress').style.width = `${pct}%`;
+      document.getElementById('hudPercent').textContent = `${pct}%`;
+      document.getElementById('hudArmy').textContent = String(currentRoundedArmy);
+      document.getElementById('hudCoins').textContent = String((currentUser ? currentUser.coins : 0) + runCoins);
+    }
+
+    function startGame() {
+      if (!currentUser) {
+        document.getElementById('lobbyModal').classList.add('hidden');
+        document.getElementById('hud').classList.add('hidden');
+        document.getElementById('authModal').classList.remove('hidden');
+        return;
+      }
+      const stageCfg = getStageConfig(selectedStage);
+      buildLevel(stageCfg);
+      gameActive = true;
+
+      document.getElementById('authModal').classList.add('hidden');
+      document.getElementById('lobbyModal').classList.add('hidden');
+      document.getElementById('resultModal').classList.add('hidden');
+      document.getElementById('bossBarWrap').classList.add('hidden');
+      document.getElementById('hud').classList.remove('hidden');
+
+      document.getElementById('hudWorldTitle').textContent = stageCfg.title;
+      document.getElementById('hudCoins').textContent = String(currentUser.coins);
+      document.getElementById('hudArmy').textContent = '1';
+      document.getElementById('hudUserBadge').textContent = currentUser.username;
+      const wObj = WEAPONS.find(w => w.id === currentUser.equippedWeapon) || WEAPONS[0];
+      document.getElementById('hudWeapon').textContent = wObj.name;
+    }
+
+    let lastFrameTime = performance.now();
+    function animate(now) {
+      requestAnimationFrame(animate);
+      const dt = Math.min(0.05, Math.max(0.001, ((now || performance.now()) - lastFrameTime) / 1000));
+      lastFrameTime = now || performance.now();
+      updateSimulation(dt);
+      if (renderer && scene && camera) {
+        renderer.render(scene, camera);
+      }
+    }
+
+    // =========================================================================
+    // 4. LOBBI, DO‘KON, 10 000 BOSQICHLI XARITA VA BOSHQARUV
+    // =========================================================================
+    function alertBox(msg) {
+      const toast = document.createElement('div');
+      toast.className = 'fixed top-5 left-1/2 -translate-x-1/2 z-50 panel-dark px-4 py-2.5 text-xs font-black text-red-300 border-red-500/50';
+      toast.textContent = msg;
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 2200);
+    }
+
+    function renderLevelMap() {
+      const unlocked = currentUser ? currentUser.unlockedStage : 1;
+      const totalPages = Math.ceil(MAX_STAGES / STAGES_PER_PAGE);
+      levelMapPage = Math.max(0, Math.min(totalPages - 1, levelMapPage));
+
+      const pageSel = document.getElementById('levelPageSelect');
+      if (pageSel.options.length !== totalPages) {
+        pageSel.innerHTML = '';
+        for (let p = 0; p < totalPages; p++) {
+          const sFrom = p * STAGES_PER_PAGE + 1;
+          const sTo = (p + 1) * STAGES_PER_PAGE;
+          const opt = document.createElement('option');
+          opt.value = String(p);
+          opt.textContent = `${sFrom} – ${sTo} bosqichlar`;
+          pageSel.appendChild(opt);
+        }
+      }
+      pageSel.value = String(levelMapPage);
+
+      const grid = document.getElementById('levelMapGrid');
+      grid.innerHTML = '';
+
+      const startS = levelMapPage * STAGES_PER_PAGE + 1;
+      const endS = Math.min(MAX_STAGES, startS + STAGES_PER_PAGE - 1);
+
+      for (let s = startS; s <= endS; s++) {
+        const isUnlocked = s <= unlocked;
+        const isSelected = s === selectedStage;
+        const isCurrentFrontier = s === unlocked;
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `btn-3d py-2 px-1 rounded-xl text-[11px] font-black border flex flex-col items-center justify-center ${
+          !isUnlocked
+            ? 'bg-slate-950/80 border-white/5 text-slate-600 cursor-not-allowed'
+            : isSelected
+              ? 'bg-blue-600 border-blue-300 text-white shadow-md shadow-blue-600/30'
+              : isCurrentFrontier
+                ? 'bg-emerald-950/80 border-emerald-400 text-emerald-300'
+                : 'bg-slate-900/90 border-white/15 text-slate-200 hover:border-blue-400'
+        }`;
+
+        btn.innerHTML = isUnlocked
+          ? `<span>${s}</span><span class="text-[9px] opacity-75">${isCurrentFrontier ? '★' : '✓'}</span>`
+          : `<span>${s}</span><span class="text-[9px]">🔒</span>`;
+
+        btn.addEventListener('click', () => {
+          if (!isUnlocked) {
+            alertBox(`${s}-bosqich qulflangan! Avval ${unlocked}-bosqichni yenging.`);
+            return;
+          }
+          selectedStage = s;
+          updateUIState();
+        });
+        grid.appendChild(btn);
+      }
+    }
+
+    function updateUIState() {
+      if (!currentUser) return;
+      const stageCfg = getStageConfig(selectedStage);
+      document.getElementById('lobbyUsername').textContent = currentUser.username;
+      document.getElementById('lobbyCoins').textContent = String(currentUser.coins);
+      document.getElementById('lobbyMaxStage').textContent = `${currentUser.unlockedStage} / 10 000`;
+      document.getElementById('selectedWorldName').textContent = stageCfg.title;
+      document.getElementById('gfxQualitySelect').value = currentUser.gfxQuality || 'medium';
+
+      const shopGrid = document.getElementById('weaponShopGrid');
+      shopGrid.innerHTML = '';
+
+      WEAPONS.forEach(w => {
+        const owned = currentUser.ownedWeapons.includes(w.id);
+        const equipped = currentUser.equippedWeapon === w.id;
+
+        const card = document.createElement('div');
+        card.className = `p-3.5 rounded-2xl border transition-all flex flex-col justify-between ${
+          equipped
+            ? 'bg-blue-950/70 border-blue-400 shadow-lg shadow-blue-600/20'
+            : 'bg-black/50 border-white/10'
+        }`;
+
+        let btnHtml = '';
+        if (equipped) {
+          btnHtml = `<button type="button" disabled class="w-full py-2 rounded-xl bg-blue-600/40 text-blue-200 text-xs font-black border border-blue-400/40">✓ TANLANGAN</button>`;
+        } else if (owned) {
+          btnHtml = `<button type="button" data-equip="${w.id}" class="btn-3d w-full py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black">QUROLNI OLISH</button>`;
+        } else {
+          const canBuy = currentUser.coins >= w.price;
+          btnHtml = `<button type="button" data-buy="${w.id}" class="btn-3d w-full py-2 rounded-xl ${
+            canBuy ? 'bg-red-600 hover:bg-red-500 text-white' : 'bg-slate-800 text-slate-400'
+          } text-xs font-black">SOTIB OLISH — ${w.price} 🪙</button>`;
+        }
+
+        card.innerHTML = `
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <span class="font-black text-sm text-white">${w.name}</span>
+              <span class="text-[11px] font-extrabold px-2 py-0.5 rounded-md ${
+                w.price === 0 ? 'bg-blue-500/20 text-blue-300' : 'bg-amber-500/20 text-amber-300'
+              }">${w.price === 0 ? 'BEPUL' : w.price + ' 🪙'}</span>
+            </div>
+            <p class="text-[11px] text-slate-400 mb-2.5">${w.desc}</p>
+            <div class="flex items-center gap-3 text-[11px] font-bold text-slate-300 mb-2.5">
+              <span>Zarar: <b class="text-red-400">${w.damage}</b></span>
+              <span>Tezlik: <b class="text-blue-400">${Math.round(1 / w.fireInterval)}/s</b></span>
+            </div>
+          </div>
+          ${btnHtml}
+        `;
+        shopGrid.appendChild(card);
+      });
+
+      shopGrid.querySelectorAll('[data-buy]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const w = WEAPONS.find(item => item.id === btn.dataset.buy);
+          if (!w || !currentUser) return;
+          if (currentUser.coins < w.price) {
+            alertBox('Tangalar yetarli emas! Jangga kirib tanga yig‘ing.');
+            return;
+          }
+          currentUser.coins -= w.price;
+          currentUser.ownedWeapons.push(w.id);
+          currentUser.equippedWeapon = w.id;
+          syncCurrentUser();
+        });
+      });
+
+      shopGrid.querySelectorAll('[data-equip]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (!currentUser) return;
+          currentUser.equippedWeapon = btn.dataset.equip;
+          syncCurrentUser();
+        });
+      });
+
+      const worldsList = document.getElementById('worldsList');
+      worldsList.innerHTML = '';
+
+      WORLDS.forEach(w => {
+        const isSel = stageCfg.world.id === w.id;
+        const targetStageForWorld = w.id <= 3 ? w.id : (w.id - 1) * 5 + 1;
+        const unlocked = currentUser.unlockedStage;
+        const isWorldUnlocked = unlocked >= targetStageForWorld;
+
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = `btn-3d text-left p-3.5 rounded-2xl border transition-all ${
+          !isWorldUnlocked
+            ? 'bg-black/40 border-white/5 opacity-60'
+            : isSel
+              ? 'bg-gradient-to-br from-blue-950/90 to-red-950/70 border-blue-400 shadow-lg'
+              : 'bg-black/50 border-white/10 hover:border-white/25'
+        }`;
+        card.innerHTML = `
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-black uppercase tracking-wider ${isSel ? 'text-blue-400' : 'text-red-400'}">
+              ${w.routeLabel}
+            </span>
+            <span class="text-[10px] font-bold ${isWorldUnlocked ? 'text-emerald-400' : 'text-slate-500'}">
+              ${isWorldUnlocked ? `${targetStageForWorld}-bosqichdan` : `🔒 ${targetStageForWorld}-bosqichda`}
+            </span>
+          </div>
+          <div class="text-sm font-black text-white mt-0.5">${w.shortName}</div>
+          <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">${w.desc}</p>
+        `;
+        card.addEventListener('click', () => {
+          if (!isWorldUnlocked) {
+            alertBox(`Bu dunyo ${targetStageForWorld}-bosqichda ochiladi!`);
+            return;
+          }
+          selectedStage = targetStageForWorld;
+          levelMapPage = Math.floor((selectedStage - 1) / STAGES_PER_PAGE);
+          updateUIState();
+        });
+        worldsList.appendChild(card);
+      });
+
+      renderLevelMap();
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') keys.left = true;
+      if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') keys.right = true;
+    });
+    window.addEventListener('keyup', (e) => {
+      if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') keys.left = false;
+      if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') keys.right = false;
+    });
+
+    const touchLeft = document.getElementById('touchLeftBtn');
+    const touchRight = document.getElementById('touchRightBtn');
+    touchLeft.addEventListener('touchstart', (e) => { e.preventDefault(); keys.left = true; }, { passive: false });
+    touchLeft.addEventListener('touchend', () => { keys.left = false; });
+    touchRight.addEventListener('touchstart', (e) => { e.preventDefault(); keys.right = true; }, { passive: false });
+    touchRight.addEventListener('touchend', () => { keys.right = false; });
+
+    const gameContainer = document.getElementById('game-container');
+    gameContainer.addEventListener('pointerdown', (e) => {
+      pointerActive = true;
+      lastPointerX = e.clientX;
+    });
+    window.addEventListener('pointermove', (e) => {
+      if (!pointerActive || !gameActive || gameEnded) return;
+      const dx = e.clientX - lastPointerX;
+      lastPointerX = e.clientX;
+      squadX += dx * 0.032;
+      squadX = Math.max(-(ROAD_HALF_WIDTH - 1.1), Math.min(ROAD_HALF_WIDTH - 1.1, squadX));
+    });
+    window.addEventListener('pointerup', () => { pointerActive = false; });
+
+    window.addEventListener('resize', () => {
+      if (!renderer || !camera) return;
+      const w = gameContainer && gameContainer.clientWidth ? gameContainer.clientWidth : window.innerWidth;
+      const h = gameContainer && gameContainer.clientHeight ? gameContainer.clientHeight : window.innerHeight;
+      camera.aspect = w / Math.max(1, h);
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    });
+
+    document.getElementById('btnPagePrev').addEventListener('click', () => {
+      levelMapPage = Math.max(0, levelMapPage - 1);
+      renderLevelMap();
+    });
+    document.getElementById('btnPageNext').addEventListener('click', () => {
+      levelMapPage = Math.min(Math.ceil(MAX_STAGES / STAGES_PER_PAGE) - 1, levelMapPage + 1);
+      renderLevelMap();
+    });
+    document.getElementById('levelPageSelect').addEventListener('change', (e) => {
+      levelMapPage = parseInt(e.target.value, 10) || 0;
+      renderLevelMap();
+    });
+    document.getElementById('btnJumpCurrent').addEventListener('click', () => {
+      if (!currentUser) return;
+      selectedStage = currentUser.unlockedStage;
+      levelMapPage = Math.floor((selectedStage - 1) / STAGES_PER_PAGE);
+      updateUIState();
+    });
+
+    document.getElementById('gfxQualitySelect').addEventListener('change', (e) => {
+      const q = e.target.value;
+      applyGraphicsQuality(q);
+      if (currentUser) {
+        currentUser.gfxQuality = q;
+        syncCurrentUser();
+      }
+    });
+
+    const authTabLogin = document.getElementById('authTabLogin');
+    const authTabRegister = document.getElementById('authTabRegister');
+    const authSubmitBtn = document.getElementById('authSubmitBtn');
+    const authError = document.getElementById('authError');
+    const authPasswordInput = document.getElementById('authPassword');
+    const btnTogglePassword = document.getElementById('btnTogglePassword');
+
+    btnTogglePassword.addEventListener('click', () => {
+      const isHidden = authPasswordInput.type === 'password';
+      authPasswordInput.type = isHidden ? 'text' : 'password';
+      btnTogglePassword.textContent = isHidden ? 'Yashirish' : 'Ko‘rish';
+    });
+
+    function showAuthError(message) {
+      authError.textContent = message;
+      authError.classList.remove('hidden');
+    }
+
+    authTabLogin.addEventListener('click', () => {
+      authMode = 'login';
+      authPasswordInput.autocomplete = 'current-password';
+      authTabLogin.className = 'py-2 rounded-lg text-xs font-black bg-blue-600 text-white';
+      authTabRegister.className = 'py-2 rounded-lg text-xs font-black text-slate-400 hover:text-white';
+      authSubmitBtn.textContent = 'HISOBGA KIRISH ▶';
+      authError.classList.add('hidden');
+    });
+
+    authTabRegister.addEventListener('click', () => {
+      authMode = 'register';
+      authPasswordInput.autocomplete = 'new-password';
+      authTabRegister.className = 'py-2 rounded-lg text-xs font-black bg-red-600 text-white';
+      authTabLogin.className = 'py-2 rounded-lg text-xs font-black text-slate-400 hover:text-white';
+      authSubmitBtn.textContent = 'RO‘YXATDAN O‘TISH ▶';
+      authError.classList.add('hidden');
+    });
+
+    document.getElementById('authForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const username = document.getElementById('authUsername').value.trim();
+      const password = authPasswordInput.value;
+
+      if (!username) {
+        showAuthError('Iltimos, foydalanuvchi nomini (login) kiriting.');
+        return;
+      }
+      if (username.length < 3) {
+        showAuthError('Foydalanuvchi nomi kamida 3 ta belgidan iborat bo‘lsin.');
+        return;
+      }
+      if (!password) {
+        showAuthError('Iltimos, parolni kiriting.');
+        return;
+      }
+      if (password.length < 3) {
+        showAuthError('Parol kamida 3 ta belgidan iborat bo‘lsin.');
+        return;
+      }
+
+      loadUsersDB();
+      const existing = findUserByUsername(username);
+
+      if (authMode === 'register') {
+        if (existing) {
+          showAuthError(`"${existing.username}" nomi allaqachon ro‘yxatdan o‘tgan! Boshqa ism tanlang yoki Kirish bo‘limiga o‘ting.`);
+          return;
+        }
+        const newAccount = normalizeUser({
+          username,
+          password,
+          coins: 50,
+          ownedWeapons: ['pistol'],
+          equippedWeapon: 'pistol',
+          unlockedStage: 1,
+          gfxQuality: gfxQuality || 'medium'
+        });
+        enterLobbyForUser(newAccount);
+      } else {
+        if (!existing) {
+          showAuthError('Bunday foydalanuvchi topilmadi! Yangi bo‘lsangiz Ro‘yxatdan o‘ting.');
+          return;
+        }
+        if (String(existing.password) !== String(password)) {
+          showAuthError('Parol noto‘g‘ri! Qayta tekshirib kiriting.');
+          return;
+        }
+        enterLobbyForUser(existing);
+      }
+    });
+
+    document.getElementById('btnLogout').addEventListener('click', () => {
+      if (currentUser) {
+        syncCurrentUser();
+      }
+      safeRemoveStorage(STORAGE_CURRENT_KEY);
+      currentUser = null;
+      gameActive = false;
+      authPasswordInput.value = '';
+      authPasswordInput.type = 'password';
+      btnTogglePassword.textContent = 'Ko‘rish';
+      document.getElementById('lobbyModal').classList.add('hidden');
+      document.getElementById('hud').classList.add('hidden');
+      document.getElementById('authModal').classList.remove('hidden');
+    });
+
+    document.getElementById('btnStartGame').addEventListener('click', startGame);
+    document.getElementById('btnRestartHud').addEventListener('click', startGame);
+    document.getElementById('btnPlayAgain').addEventListener('click', startGame);
+    document.getElementById('btnNextStage').addEventListener('click', () => {
+      if (selectedStage < MAX_STAGES) {
+        selectedStage++;
+        levelMapPage = Math.floor((selectedStage - 1) / STAGES_PER_PAGE);
+      }
+      startGame();
+    });
+
+    document.getElementById('btnMenuHud').addEventListener('click', () => {
+      gameActive = false;
+      document.getElementById('hud').classList.add('hidden');
+      document.getElementById('lobbyModal').classList.remove('hidden');
+      updateUIState();
+    });
+
+    document.getElementById('btnBackLobby').addEventListener('click', () => {
+      gameActive = false;
+      document.getElementById('resultModal').classList.add('hidden');
+      document.getElementById('lobbyModal').classList.remove('hidden');
+      updateUIState();
+    });
+
+    function initAuthAndApp() {
+      initThreeScene();
+      tryAutoLogin();
+      requestAnimationFrame(animate);
+    }
+
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+      initAuthAndApp();
+    } else {
+      window.addEventListener('DOMContentLoaded', initAuthAndApp, { once: true });
+    }
+  })();
+  </script>
+</body>
+</html>
